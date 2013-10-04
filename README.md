@@ -1,7 +1,7 @@
-FetchIO
+fetchIO
 =======
 
-[FetchIO](https://github.com/gip/fetchio) is a simple, configurable, fault-tolerant http crawler written in Haskell. 
+[fetchIO](https://github.com/gip/fetchio) is a simple, configurable, fault-tolerant http crawler written in Haskell. 
 
 The main features are:
 
@@ -13,9 +13,9 @@ The main features are:
 History
 -------
 
-The previous version of this tool, [Fureteur](https://github.com/gip/fureteur), was written in Scala. The scalability quickly became an issue however, not to mention the high load on the machine. The use of Scala actors provided a very nice abstraction in order to write [Fureteur](https://github.com/gip/fureteur), however reaching high-performance with acceptable hardware quickly became an issue.
+The previous version of this tool, [fureteur](https://github.com/gip/fureteur), was written in Scala. The scalability quickly became an issue however, not to mention the high load on the machine. The use of Scala actors provided a very nice abstraction during the implementation of [fureteur](https://github.com/gip/fureteur). However reaching high-performance with acceptable hardware quickly became an issue.
 
-[FetchIO](https://github.com/gip/fetchio) uses Haskell lightweight threads. Refer to [this book](http://book.realworldhaskell.org/read/concurrent-and-multicore-programming.html) for more information regarding Haskell forkIO and concurrent programming.
+[fetchIO](https://github.com/gip/fetchio) uses Haskell lightweight threads. Refer to [this book](http://book.realworldhaskell.org/read/concurrent-and-multicore-programming.html) for more information regarding Haskell forkIO and concurrent programming. While very simple, [fetchIO](https://github.com/gip/fetchio) is able to reach very high performance on commoditized servers.
 
 
 Distributed Crawling
