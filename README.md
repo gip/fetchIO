@@ -7,7 +7,7 @@ The main features are:
 
 * Configurable number of concurrent fetcher pipelines
 * Reuse of http connection (configurable)
-* fetched HTML is zipped and binary64-encoded
+* Fetched HTML is zipped and binary64-encoded
 * Configurable using a simple JSON file
 
 History

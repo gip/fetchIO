@@ -64,9 +64,18 @@ start cfg = do
 
 waitFor tc = do 
   threadDelay 100000
-  s <- atomically $ Main.tryReadTChan tc
-  when (isJust s) $ putStrLn (fromJust s)
+  handle
   waitFor tc
+  where
+    handle = do 
+      s <- atomically $ Main.tryReadTChan tc
+      if(isJust s)
+      then do
+        putStrLn (fromJust s)
+        handle
+      else
+        return ()
+
 
 simpleFetch tchan
             in_c@(in_h, in_p, in_login, in_passw)       -- AMQP host
