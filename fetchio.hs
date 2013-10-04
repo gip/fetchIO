@@ -28,7 +28,7 @@ import System.Environment
 
 data Level = Err | Info deriving (Show)
 
-output l m = putStrLn ("chsrap: " ++ (p l) ++ ": " ++ m)
+output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
   where p Err = "error"
         p Info = "info"
 
@@ -38,13 +38,14 @@ logger m = do
 
 main = do
   args <- getArgs
-  cfg <- (liftM $ decode) (BL.readFile $ Prelude.head args)
-  if isJust cfg 
-  then
-    let cfg' = fromJust cfg in
-    start cfg'
-  else
-    output Err "Couldn't read configuration"
+  catchAny (do
+    cfg <- (liftM $ decode) (BL.readFile $ Prelude.head args)
+    if isJust cfg 
+    then
+      let cfg' = fromJust cfg in
+      start cfg'
+    else
+      output Err "couldn't read configuration") (\_ -> output Err "usage: fetchio <configuration file>")
   return ()
 
 start cfg = do 
