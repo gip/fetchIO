@@ -32,6 +32,10 @@ output l m = putStrLn ("chsrap: " ++ (p l) ++ ": " ++ m)
   where p Err = "error"
         p Info = "info"
 
+logger m = do
+  t <- getClockTime
+  putStrLn $ (show t) ++ ": " ++ m
+
 main = do
   args <- getArgs
   cfg <- (liftM $ decode) (BL.readFile $ Prelude.head args)
@@ -71,7 +75,7 @@ simpleFetch tchan
             wait
             proxy                  -- Proxy host (Maybe)
             = do
-  putStrLn ("Starting pipeline with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy)) 
+  logger ("Starting pipeline with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy)) 
   conn <- openConnection (T.unpack in_h) "/" (fromMaybe "" in_login) (fromMaybe "" in_passw)
   chan <- openChannel conn
   chano <- if in_c == out_c 
@@ -99,7 +103,7 @@ iter cin cout qi eo mng proxy = do
   where 
   	doit mi rraw tag = do
         let url = (T.unpack . fromJust $ fetch_url mi)
-        putStrLn $ "Fetching " ++ url
+        logger $ "Fetching " ++ url
         (r,dt,ts) <- fetch proxy mng url (getHeaders mi)
         let code = statusCode $ responseStatus r
         let mo = MsgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
@@ -108,11 +112,11 @@ iter cin cout qi eo mng proxy = do
                           fetch_proxy = Just $ (\(h,p,_,_) -> T.concat [h, ":", T.pack $ show p]) $ proxy,
                           fetch_time = Just ts
                           }
-        putStrLn $ "   status " ++ (show $ code) ++ ", latency " ++ (show dt)
+        logger $ "   status " ++ (show $ code) ++ ", latency " ++ (show dt)
         let rk = T.concat [fetch_routing_key mi, ":", T.pack $ show code]
         let msg = newMsg { msgBody = encode $ copyFields (toJSON mo) (fromJust $ decode rraw) } -- TODO: Improve that
         publishMsg cout eo rk msg
-        putStrLn ("Publishing with key " ++ (show rk))
+        logger ("Publishing with key " ++ (show rk))
         ackMsg cin tag False
 
 pop c q = do
