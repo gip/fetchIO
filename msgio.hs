@@ -58,7 +58,8 @@ data MsgOut = MsgOut {
   fetch_latency :: Maybe Int,
   fetch_status_code :: Maybe Int,
   fetch_proxy :: Maybe Text,
-  fetch_time :: Maybe Integer
+  fetch_time :: Maybe Integer,
+  fetch_redirect :: Maybe Text
 } deriving(Generic, Show)
 
 instance ToJSON MsgOut

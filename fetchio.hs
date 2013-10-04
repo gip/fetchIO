@@ -8,13 +8,14 @@ import Data.Text.Encoding
 import Data.Maybe
 import Data.Aeson
 import Data.Text as T hiding(map)
+--import Data.Text.Lazy.Encoding
 import System.Time
 import Network
 import Network.AMQP
 import Network.AMQP.Types
 import Data.Conduit
 import Network.HTTP.Types.Status
-import Network.HTTP.Conduit
+import Network.HTTP.Conduit as C
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
 import Control.Exception
@@ -25,6 +26,8 @@ import Control.Monad(when, liftM)
 import Control.Applicative ((<$>))
 import System.Environment
 
+
+-- (ThreadId, Eihter String Int)
 
 data Level = Err | Info deriving (Show)
 
@@ -60,7 +63,7 @@ start cfg = do
       let h = allHost (http_hosts pipe)
       mapM_ (forkIO . simpleFetch tc in_c out_c (amqp_in_queue pipe) (amqp_out_exchange pipe) (http_min_delay pipe)) h
       waitFor tc
-      return ()
+      return () -- Dead
 
 waitFor tc = do 
   threadDelay 100000
@@ -115,14 +118,13 @@ iter cin cout qi eo mng proxy = do
         let url = (T.unpack . fromJust $ fetch_url mi)
         let proxys = Just $ (\(h,p,_,_) -> T.concat [h, ":", T.pack $ show p]) $ proxy
         logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
-        (r,dt,ts) <- fetch proxy mng url (getHeaders mi)
-        let code = statusCode $ responseStatus r
+        (code,r,dt,ts,redirect) <- fetch proxy mng url (getHeaders mi)
         let mo = MsgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
                           fetch_status_code = Just code,
                           fetch_latency = Just dt,
                           fetch_proxy = proxys,
-                          fetch_time = Just ts
-                          }
+                          fetch_time = Just ts,
+                          fetch_redirect = fmap decodeUtf8 redirect }
         logger $ "Fetched " ++ url ++ ", " ++ (show proxys) ++ ", status " ++ (show $ code) ++ ", latency " ++ (show dt)
         let rk = T.concat [fetch_routing_key mi, ":", T.pack $ show code]
         let msg = newMsg { msgBody = encode $ copyFields (toJSON mo) (fromJust $ decode rraw) } -- TODO: Improve that
@@ -130,6 +132,7 @@ iter cin cout qi eo mng proxy = do
         logger ("Publishing with key " ++ (show rk))
         ackMsg cin tag False
 
+-- Pop a message from AMQP
 pop c q = do
   m0 <- getMsg c Ack q
   let r = case m0 of Just(m) -> let (msg,tag) = (\ (a,b) -> (msgBody a, envDeliveryTag b)) m in
@@ -137,17 +140,35 @@ pop c q = do
                      Nothing -> Nothing
   return r
 
+
+
+-- Simple fetch wo redirect
 fetch proxy mng url he = do
   req <- parseUrl url 
   t0 <- getClockTime
-  let req0 = req { checkStatus = \_ _ _-> Nothing }
+  let req0 = req { checkStatus = \_ _ _-> Nothing, redirectCount = 0 }
   let req1 = case proxy of ("localhost", 80, Nothing, Nothing) -> req0
                            (h,p, _, _) -> addProxy (encodeUtf8 h) p req0
   let req2 = req1 { requestHeaders = he ++ (requestHeaders req1) }
-  r <- runResourceT $ httpLbs req2 mng
+  -- Fetch
+  --r <- runResourceT $ httpLbs req2 mng
+  (code, r, redirect) <- fetchF req2 Nothing
   t1 <- getClockTime
   dt <- return $ (toMicros $ diffClockTimes t1 t0) `div` 1000
-  return (r, dt,case t1 of TOD ts _ -> ts)
+  return (code, r, dt,case t1 of TOD ts _ -> ts, redirect)
+  where
+    urlFromRequest r = BS.concat [if secure r then "https://" else "http://", C.host r, C.path r] 
+    fetchF req redirect = do
+      (code, r, reqredirect) <- runResourceT $ do 
+        r' <- httpLbs req mng
+        let code' = statusCode $ responseStatus r'
+        return (code', r', getRedirectedRequest req (responseHeaders r') (responseCookieJar r') code')
+      if isJust reqredirect
+      then 
+        fetchF (fromJust reqredirect) (Just $ fromJust reqredirect)
+      else
+        return (code, r, fmap urlFromRequest redirect)
+
 
 
 --
