@@ -126,6 +126,7 @@ iter cin cout qi eo mng proxy = do
                           fetch_time = Just ts,
                           fetch_redirect = fmap decodeUtf8 redirect }
         logger $ "Fetched " ++ url ++ ", " ++ (show proxys) ++ ", status " ++ (show $ code) ++ ", latency " ++ (show dt)
+                            ++ ", redirect " ++ (show redirect)
         let rk = T.concat [fetch_routing_key mi, ":", T.pack $ show code]
         let msg = newMsg { msgBody = encode $ copyFields (toJSON mo) (fromJust $ decode rraw) } -- TODO: Improve that
         publishMsg cout eo rk msg
