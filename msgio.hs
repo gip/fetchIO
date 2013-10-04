@@ -26,7 +26,6 @@ data MsgIn = MsgIn {
   fetch_headers :: Maybe [Header],
   fetch_routing_key :: Text
 } deriving (Generic, Show)
--- { "fetch_url" : "http://www.linkedin.com/in/pirio", "fetch_routing_key": "test", "fetch_blabla" : "Nine" }
 
 
 instance FromJSON Header
@@ -50,7 +49,7 @@ instance ToJSON MString where
   toJSON (MString (Left t)) = toJSON t
 
 data MsgOut = MsgOut {
-  fetch_data :: MString,
+  fetch_data :: Maybe MString,
   fetch_latency :: Maybe Int,
   fetch_status :: Maybe Int,
   fetch_proxy :: Maybe Text,
@@ -107,8 +106,6 @@ instance FromJSON CfgTop
 getHostGroup :: CfgTop -> Text -> Maybe CfgHostGroup
 getHostGroup cfg g = join (liftM (L.find (\hg -> MsgIO.group hg == g)) $ groups cfg)
   
-
-
 copyFields (Object o0) (Object o1) = Object (HM.union o0 o1)
   
 
