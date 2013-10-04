@@ -51,7 +51,7 @@ instance ToJSON MString where
 data MsgOut = MsgOut {
   fetch_data :: Maybe MString,
   fetch_latency :: Maybe Int,
-  fetch_status :: Maybe Int,
+  fetch_status_code :: Maybe Int,
   fetch_proxy :: Maybe Text,
   fetch_time :: Maybe Integer
 } deriving(Generic, Show)

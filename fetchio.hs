@@ -105,12 +105,12 @@ iter cin cout qi eo mng proxy = do
         (r,dt,ts) <- fetch proxy mng url
         let code = statusCode $ responseStatus r
         let mo = MsgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
-                          fetch_status = Just code,
+                          fetch_status_code = Just code,
                           fetch_latency = Just dt,
                           fetch_proxy = Just $ (\(h,p,_,_) -> T.concat [h, ":", T.pack $ show p]) $ proxy,
                           fetch_time = Just ts
                           }
-        putStrLn $ "   status " ++ (show $ fetch_status mo) ++ ", latency " ++ (show dt)
+        putStrLn $ "   status " ++ (show $ code) ++ ", latency " ++ (show dt)
         let rk = T.concat [fetch_routing_key mi, ":", T.pack $ show code]
         let msg = newMsg { msgBody = encode $ copyFields (toJSON mo) (fromJust $ decode rraw) } -- TODO: Improve that
         publishMsg cout eo rk msg
