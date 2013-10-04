@@ -87,8 +87,6 @@ simpleFetch tchan
     loop c co mng = do
         catchAny (iter c co qin eout mng proxy) (\e -> do { atomically (writeTChan tchan $ show e); return () })
         when(isJust wait) (threadDelay $ 1000 * fromJust wait)
-        tid <- myThreadId
-        atomically (writeTChan tchan $ show tid)
         loop c co mng
 
 
