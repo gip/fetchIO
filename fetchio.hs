@@ -130,7 +130,7 @@ pop c q = do
 fetch proxy mng url he = do
   req <- parseUrl url 
   t0 <- getClockTime
-  let req0 = req { checkStatus = \_ _ _-> Nothing }
+  let req0 = req { checkStatus = \_ _ _-> Nothing, responseTimeout = Just 15000000 }
   let req1 = case proxy of ("localhost", 80, Nothing, Nothing) -> req0
                            (h,p, _, _) -> addProxy (encodeUtf8 h) p req0
   let req2 = req1 { requestHeaders = he ++ (requestHeaders req1) }
