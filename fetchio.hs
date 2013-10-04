@@ -102,7 +102,7 @@ iter cin cout qi eo mng proxy = do
   	doit mi rraw tag = do
         let url = (T.unpack . fromJust $ fetch_url mi)
         putStrLn $ "Fetching " ++ url
-        (r,dt,ts) <- fetch proxy mng url
+        (r,dt,ts) <- fetch proxy mng url (getHeaders mi)
         let code = statusCode $ responseStatus r
         let mo = MsgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
                           fetch_status_code = Just code,
@@ -124,13 +124,14 @@ pop c q = do
                      Nothing -> Nothing
   return r
 
-fetch proxy mng url = do
+fetch proxy mng url he = do
   req <- parseUrl url 
   t0 <- getClockTime
   let req0 = req { checkStatus = \_ _ _-> Nothing }
   let req1 = case proxy of ("localhost", 80, Nothing, Nothing) -> req0
                            (h,p, _, _) -> addProxy (encodeUtf8 h) p req0
-  r <- runResourceT $ httpLbs req1 mng
+  let req2 = req1 { requestHeaders = he ++ (requestHeaders req1) }
+  r <- runResourceT $ httpLbs req2 mng
   t1 <- getClockTime
   dt <- return $ (toMicros $ diffClockTimes t1 t0) `div` 1000
   return (r, dt,case t1 of TOD ts _ -> ts)

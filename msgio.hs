@@ -8,12 +8,14 @@ import Data.Text (Text,strip,splitOn)
 import Data.Aeson
 import Data.Maybe
 import qualified Data.HashMap.Strict as HM
+import Data.Text.Encoding
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.ByteString.Base64 as B64
 import GHC.Generics
 import qualified Codec.Compression.Zlib as Z
 import Control.Monad
+import qualified Data.CaseInsensitive as CI
 
 --
 -- Input
@@ -32,6 +34,9 @@ instance FromJSON Header
 instance FromJSON MsgIn
 instance ToJSON Header
 instance ToJSON MsgIn
+
+getHeaders mi = map (\h -> (CI.mk (encodeUtf8 $ field h), encodeUtf8 $ value h)) (case fetch_headers mi of Nothing -> [] 
+                                                                                                           Just a -> a)
 
 getURLs mi =
   if(isJust $ fetch_url mi) then (fromJust $ fetch_url mi) : []
