@@ -27,8 +27,6 @@ import Control.Applicative ((<$>))
 import System.Environment
 
 
--- (ThreadId, Eihter String Int)
-
 data Level = Err | Info deriving (Show)
 
 output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
@@ -110,11 +108,18 @@ simpleFetch tchan
 
 iter cin cout qi eo mng proxy = do
   r <- pop cin qi
-  when(isJust r) $ do let (mi,tag, rraw) = fromJust r in
-  	                  catchAny (doit mi rraw tag) (\e -> do { putStrLn $ show e ;rejectMsg cin tag True} )
+  when(isJust r) $ do 
+    let (mi,tag, rraw) = fromJust r
+    catchAny (doit' mi rraw tag) (\e -> do { putStrLn $ show e ;reject tag } )
   return ()
-  where 
-  	doit mi rraw tag = do
+  where
+    doit' mi rraw tag = catches (doit mi rraw tag) (handlers tag)
+    handlers tag = [Handler (\ (InvalidUrlException s ss) -> do { putStrLn $ s++" "++ss ;ack tag } )]
+    reject tag = rejectMsg cin tag True
+    ack tag = do
+      ackMsg cin tag False
+      return ()
+    doit mi rraw tag = do
         let url = (T.unpack . fromJust $ fetch_url mi)
         let proxys = Just $ (\(h,p,_,_) -> T.concat [h, ":", T.pack $ show p]) $ proxy
         logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
@@ -131,7 +136,7 @@ iter cin cout qi eo mng proxy = do
         let msg = newMsg { msgBody = encode $ copyFields (toJSON mo) (fromJust $ decode rraw) } -- TODO: Improve that
         publishMsg cout eo rk msg
         logger ("Publishing with key " ++ (show rk))
-        ackMsg cin tag False
+        ack tag
 
 -- Pop a message from AMQP
 pop c q = do
@@ -143,7 +148,7 @@ pop c q = do
 
 
 
--- Simple fetch wo redirect
+-- Fetch with redirect
 fetch proxy mng url he = do
   req <- parseUrl url 
   t0 <- getClockTime
