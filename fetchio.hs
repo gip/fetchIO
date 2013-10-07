@@ -123,7 +123,7 @@ iter cin cout qi eo mng proxy = do
       putStrLn $ s++" "++ss
       return True
     handlerHttpE e = do
-      putStrLn $ show e
+      putStrLn $ (show e) ++ " " ++ (show proxy)
       return False
     reject tag = rejectMsg cin tag True
     ack tag = do
