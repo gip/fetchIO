@@ -114,7 +114,17 @@ iter cin cout qi eo mng proxy = do
   return ()
   where
     doit' mi rraw tag = catches (doit mi rraw tag) (handlers tag)
-    handlers tag = [Handler (\ (InvalidUrlException s ss) -> do { putStrLn $ s++" "++ss ;ack tag } )]
+    handlerWrap tag h = Handler (\e -> do
+      b <- h e
+      if b then ack tag else reject tag
+      )
+    handlers tag = [ handlerWrap tag handlerHttpE ]
+    handlerHttpE (InvalidUrlException s ss) = do
+      putStrLn $ s++" "++ss
+      return True
+    handlerHttpE e = do
+      putStrLn $ show e
+      return False
     reject tag = rejectMsg cin tag True
     ack tag = do
       ackMsg cin tag False
