@@ -86,7 +86,7 @@ simpleFetch tchan
             wait
             proxy                  -- Proxy host (Maybe)
             = do
-  logger ("Starting pipeline with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy)) 
+  logger ("Building pipeline with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy)) 
   conn <- openConnection (T.unpack in_h) "/" (fromMaybe "" in_login) (fromMaybe "" in_passw)
   chan <- openChannel conn
   chano <- if in_c == out_c 
@@ -96,6 +96,7 @@ simpleFetch tchan
            	  conno <- openConnection (T.unpack out_h) "/" (fromMaybe "" out_login) (fromMaybe "" out_passw)
            	  openChannel conno
   mng <- newManager $ def { managerResponseTimeout = Just 15000000 }
+  logger ("Pipeline ready with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy)) 
   loop chan chano mng
   return ()
   where
