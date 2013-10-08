@@ -35,7 +35,9 @@ output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
 
 logger m = do
   t <- getClockTime
-  putStrLn $ "[" ++ (show t) ++ "] " ++ m
+  ct <- toCalendarTime t
+  let st = calendarTimeToString ct
+  putStrLn $ "[" ++ st ++ "] " ++ m
 
 main = do
   args <- getArgs
