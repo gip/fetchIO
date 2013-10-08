@@ -36,11 +36,7 @@ output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
 
 logger m = do
   t <- getClockTime
-  ct <- toCalendarTime t
-  let st = formatCalendarTime defaultTimeLocale rfc2822 ct
-  putStrLn $ "[" ++ st ++ "] " ++ m
-  where
-    rfc2822 = "%a, %d %b %Y %T %z"
+  putStrLn $ Prelude.concat ["[", show t, "][ts:", case t of TOD ts _ -> show ts,"] ", m]
 
 main = do
   args <- getArgs
