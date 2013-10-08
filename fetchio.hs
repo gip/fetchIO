@@ -97,7 +97,7 @@ simpleFetch tchan
            else do
            	  conno <- openConnection (T.unpack out_h) "/" (fromMaybe "" out_login) (fromMaybe "" out_passw)
            	  openChannel conno
-  mng <- newManager $ def { managerResponseTimeout = Just 15000000 }
+  mng <- newManager $ def -- { managerResponseTimeout = Just (30*1000*1000) }  -- 30s timeout
   logger ("Pipeline ready with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy)) 
   loop chan chano mng
   return ()
