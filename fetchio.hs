@@ -10,6 +10,7 @@ import Data.Aeson
 import Data.Text as T hiding(map)
 --import Data.Text.Lazy.Encoding
 import System.Time
+import System.Locale
 import Network
 import Network.AMQP
 import Network.AMQP.Types
@@ -36,8 +37,10 @@ output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
 logger m = do
   t <- getClockTime
   ct <- toCalendarTime t
-  let st = calendarTimeToString ct
+  let st = formatCalendarTime defaultTimeLocale rfc2822 ct
   putStrLn $ "[" ++ st ++ "] " ++ m
+  where
+    rfc2822 = "%a, %d %b %Y %T %z"
 
 main = do
   args <- getArgs
