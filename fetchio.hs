@@ -8,6 +8,7 @@ import Data.Text.Encoding
 import Data.Maybe
 import Data.Aeson
 import Data.Text as T hiding(map)
+import Data.Typeable
 --import Data.Text.Lazy.Encoding
 import System.Time
 import System.Locale
@@ -25,10 +26,16 @@ import Control.Concurrent.STM
 import Control.Concurrent.STM.TChan
 import Control.Monad(when, liftM)
 import Control.Applicative ((<$>))
+import Control.Monad(forever)
 import System.Environment
+import System.Timeout
 
 
 data Level = Err | Info deriving (Show)
+
+data FetchTimeout = FetchTimeout deriving (Show, Typeable)
+
+instance Exception FetchTimeout
 
 output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
   where p Err = "error"
@@ -96,23 +103,24 @@ simpleFetch tchan
            else do
            	  conno <- openConnection (T.unpack out_h) "/" (fromMaybe "" out_login) (fromMaybe "" out_passw)
            	  openChannel conno
-  mng <- newManager $ def -- { managerResponseTimeout = Just (30*1000*1000) }  -- 30s timeout
-  logger ("Pipeline ready with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy)) 
-  loop chan chano mng
+  loop0 chan chano
   return ()
   where
-    loop c co mng = do
-        catchAny (iter c co qin eout mng proxy) (\e -> do { atomically (writeTChan tchan $ show e); return () })
+    loop0 chan chano = forever $ do
+      mng <- newManager def 
+      logger ("Pipeline ready with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy)) 
+      catches (loop chan chano mng) [Handler (\e -> do { putStrLn $ show (e::FetchTimeout); closeManager mng })]
+    loop c co mng = forever $ do
+        iter c co qin eout mng proxy
         when(isJust wait) (threadDelay $ 1000 * fromJust wait)
-        loop c co mng
-
-
+        
 
 iter cin cout qi eo mng proxy = do
   r <- pop cin qi
   when(isJust r) $ do 
     let (mi,tag, rraw) = fromJust r
-    catchAny (doit' mi rraw tag) (\e -> do { putStrLn $ show e ;reject tag } )
+    --catchAny (doit' mi rraw tag) (\e -> do { putStrLn $ show e ;reject tag } )
+    doit' mi rraw tag
   return ()
   where
     doit' mi rraw tag = catches (doit mi rraw tag) (handlers tag)
@@ -135,7 +143,9 @@ iter cin cout qi eo mng proxy = do
         let url = (T.unpack . fromJust $ fetch_url mi)
         let proxys = Just $ (\(h,p,_,_) -> T.concat [h, ":", T.pack $ show p]) $ proxy
         logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
-        (code,r,dt,ts,redirect) <- fetch proxy mng url (getHeaders mi)
+        tuple <- timeout (15*1000*1000) $ fetch proxy mng url (getHeaders mi)
+        let (code,r,dt,ts,redirect) = case tuple of Just val -> val
+                                                    Nothing -> throw FetchTimeout
         let mo = MsgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
                           fetch_status_code = Just code,
                           fetch_latency = Just dt,
