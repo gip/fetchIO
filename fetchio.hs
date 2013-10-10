@@ -113,7 +113,7 @@ simpleFetch tchan
     loop c co mng = forever $ do
         iter c co qin eout mng proxy
         when(isJust wait) (threadDelay $ 1000 * fromJust wait)
-        
+
 
 iter cin cout qi eo mng proxy = do
   r <- pop cin qi
@@ -124,11 +124,12 @@ iter cin cout qi eo mng proxy = do
   return ()
   where
     doit' mi rraw tag = catches (doit mi rraw tag) (handlers tag)
-    handlerWrap tag h = Handler (\e -> do
+    handlerWrap tag h action = Handler (\e -> do
       b <- h e
       if b then ack tag else reject tag
+      action
       )
-    handlers tag = [ handlerWrap tag handlerHttpE ]
+    handlers tag = [ handlerWrap tag handlerHttpE (return ()), handlerWrap tag (\(e::FetchTimeout) -> return True) (throw FetchTimeout) ]
     handlerHttpE (InvalidUrlException s ss) = do
       putStrLn $ s++" "++ss
       return True
