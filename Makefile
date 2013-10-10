@@ -1,9 +1,11 @@
 
 
+SRCFILES= msgio.hs http.hs fetchio.hs
+
 all: fetchio
 
-fetchio: msgio.hs fetchio.hs
-	ghc -O2 -XDeriveDataTypeable -XScopedTypeVariables --make msgio.hs fetchio.hs
+fetchio: $(SRCFILES)
+	ghc -O2 -XDeriveDataTypeable -XScopedTypeVariables --make $(SRCFILES)
 
 clean:
 	-rm -f fetchio *.hi *.o
