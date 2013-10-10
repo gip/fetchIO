@@ -158,7 +158,7 @@ iter cin cout qi eo mng proxy = do
         let rk = T.concat [fetch_routing_key mi, ":", T.pack $ show code]
         let msg = newMsg { msgBody = encode $ copyFields (toJSON mo) (fromJust $ decode rraw) } -- TODO: Improve that
         case code of
-          c | c==200 || c==400 -> do              
+          c | c==200 || c==404 -> do              
             publishMsg cout eo rk msg
             logger ("Publishing with key " ++ (show rk))
             ack tag
