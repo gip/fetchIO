@@ -162,8 +162,8 @@ iter cin cout qi eo mng proxy = do
             publishMsg cout eo rk msg
             logger ("Publishing with key " ++ (show rk))
             ack tag
-          _ -> do -- Retry
-            logger ("Rejecting message")
+          c -> do -- Retry
+            logger ("Rejecting message, code " ++ (show c))
             reject tag
 
 -- Pop a message from AMQP
