@@ -139,7 +139,9 @@ iter cin cout qi eo mng proxy = do
       return True
     handlerHttpE (TlsException s) = do
       putStrLn $ (show s)
-      return False
+      return True
+    handlerHttpE (HandshakeFailed) = do
+      return True
     handlerHttpE e = do
       putStrLn $ (show e) ++ " " ++ (show proxy)
       return False
