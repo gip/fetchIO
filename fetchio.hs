@@ -35,8 +35,10 @@ import System.Timeout
 data Level = Err | Info deriving (Show)
 
 data FetchTimeout = FetchTimeout deriving (Show, Typeable)
+data WrongFormat = WrongFormat deriving (Show, Typeable)
 
 instance Exception FetchTimeout
+instance Exception WrongFormat
 
 output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
   where p Err = "error"
@@ -130,10 +132,14 @@ iter cin cout qi eo mng proxy = do
       if b then ack tag else reject tag
       action
       )
-    handlers tag = [ handlerWrap tag handlerHttpE (return ()), handlerWrap tag (\(e::FetchTimeout) -> return True) (throw FetchTimeout) ]
+    handlers tag = [ handlerWrap tag handlerHttpE (return ()), handlerWrap tag (\(e::FetchTimeout) -> return False) (throw FetchTimeout),
+                     handlerWrap tag (\(e::WrongFormat) -> return True) (return ()) ]
     handlerHttpE (InvalidUrlException s ss) = do
       putStrLn $ s++" "++ss
       return True
+    handlerHttpE (TlsException s) = do
+      putStrLn $ (show s)
+      return False
     handlerHttpE e = do
       putStrLn $ (show e) ++ " " ++ (show proxy)
       return False
@@ -142,7 +148,8 @@ iter cin cout qi eo mng proxy = do
       ackMsg cin tag False
       return ()
     doit mi rraw tag = do
-        let url = (T.unpack . fromJust $ fetch_url mi)
+        let url = case fetch_url mi of Just u -> T.unpack u
+                                       Nothing -> throw WrongFormat
         let proxys = Just $ (\(h,p,_,_) -> T.concat [h, ":", T.pack $ show p]) $ proxy
         logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
         tuple <- timeout (15*1000*1000) $ fetch proxy mng url (getHeaders mi)

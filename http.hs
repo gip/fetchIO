@@ -9,14 +9,11 @@ import Data.Maybe
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 
---import Network
 import Network.HTTP.Types.Status
 import Network.HTTP.Conduit as C
 import Network.HTTP.Types.Header
 
 import System.Time
-
-import qualified Data.ByteString as BS
 
 --
 -- Fetch with redirect
