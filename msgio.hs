@@ -65,6 +65,17 @@ data MsgOut = MsgOut {
 
 instance ToJSON MsgOut
 
+msgOut = MsgOut {
+  fetch_data = Nothing,
+  fetch_latency = Nothing,
+  fetch_status_code = Nothing,
+  fetch_proxy = Nothing,
+  fetch_time = Nothing,
+  fetch_redirect = Nothing,
+  fetch_response_array = Nothing
+}
+
+
 --
 -- Config
 --

@@ -173,7 +173,7 @@ iter cin cout qi eo mng proxy = do
                               ++ ", redirect " ++ (show redirect)
           return moo) urls
         let (code,mout)= case mo of m:[] -> (fetch_status_code m, m) 
-                                    m:tl -> (fetch_status_code m, MsgOut { fetch_response_array = Just mo } )
+                                    m:tl -> (fetch_status_code m, msgOut { fetch_response_array = Just mo } )
         let rk = T.concat [fetch_routing_key mi, ":", T.pack $ show code]
         let msg = newMsg { msgBody = encode $ copyFields (toJSON mo) (fromJust $ decode rraw) } -- TODO: Improve that
         case code of
