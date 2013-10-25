@@ -40,7 +40,7 @@ getHeaders mi = map (\h -> (CI.mk (encodeUtf8 $ field h), encodeUtf8 $ value h))
 
 getURLs mi =
   if(isJust $ fetch_url mi) then (fromJust $ fetch_url mi) : []
-  	                        else map strip (splitOn " " (fromJust $ fetch_urls mi))
+  	                        else filter (\s -> s /= "") $ map strip (splitOn " " (fromJust $ fetch_urls mi))
 
 
 --
