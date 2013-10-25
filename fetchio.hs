@@ -9,6 +9,7 @@ import Data.Text.Encoding
 import Data.Maybe
 import Data.Aeson
 import Data.Text as T hiding(map)
+import Data.Text.Encoding
 import Data.Typeable
 --import Data.Text.Lazy.Encoding
 import System.Time
@@ -95,9 +96,9 @@ simpleFetch tchan
             qin                    -- Queue in
             eout                   -- Queue out
             wait
-            proxy                  -- Proxy host (Maybe)
+            (pn,pp,puser,ppass)    -- Proxy host (Maybe)
             = do
-  logger ("Building pipeline with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy)) 
+  logger ("Building pipeline with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy))
   conn <- openConnection (T.unpack in_h) "/" (fromMaybe "" in_login) (fromMaybe "" in_passw)
   chan <- openChannel conn
   chano <- if in_c == out_c 
@@ -109,6 +110,7 @@ simpleFetch tchan
   loop0 chan chano
   return ()
   where
+    proxy= (pn, pp, liftM encodeUtf8 puser, liftM encodeUtf8 ppass)
     loop0 chan chano = forever $ do
       mng <- newManager def 
       logger ("Pipeline ready with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy)) 

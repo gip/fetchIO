@@ -18,7 +18,7 @@ import System.Time
 --
 -- Fetch with redirect
 --
-fetch :: (Text, Int, Maybe t, Maybe t1)  -- Proxy - could be localhost
+fetch :: (Text, Int, Maybe BS.ByteString, Maybe BS.ByteString)  -- Proxy - could be localhost
       -> Manager                         -- Http manager
       -> String                          -- URL to fetcg
       -> [Header]                        -- Headers
@@ -30,9 +30,11 @@ fetch proxy mng url he = do
   let req1 = case proxy of ("localhost", 80, Nothing, Nothing) -> req0
                            (h,p, _, _) -> addProxy (encodeUtf8 h) p req0
   let req2 = req1 { requestHeaders = he ++ (requestHeaders req1) }
+  let req3 = case proxy of (_,_,Just user, Just pass) -> applyBasicAuth user pass req2
+                           _ -> req2
   -- Fetch
   --r <- runResourceT $ httpLbs req2 mng
-  (code, r, redirect) <- fetchF req2 Nothing
+  (code, r, redirect) <- fetchF req3 Nothing
   t1 <- getClockTime
   dt <- return $ (toMicros $ diffClockTimes t1 t0) `div` 1000
   return (code, r, dt, case t1 of TOD ts _ -> ts, redirect)
