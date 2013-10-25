@@ -175,7 +175,7 @@ iter cin cout qi eo mng proxy = do
         let (code,mout)= case mo of m:[] -> (fetch_status_code m, m) 
                                     m:tl -> (fetch_status_code m, msgOut { fetch_response_array = Just mo } )
         let rk = T.concat [fetch_routing_key mi, ":", T.pack $ show code]
-        let msg = newMsg { msgBody = encode $ copyFields (toJSON mo) (fromJust $ decode rraw) } -- TODO: Improve that
+        let msg = newMsg { msgBody = encode $ copyFields (toJSON mout) (fromJust $ decode rraw) } -- TODO: Improve that
         case code of
           Just c | c==200 || c==404 -> do              
             publishMsg cout eo rk msg
