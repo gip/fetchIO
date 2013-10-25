@@ -153,29 +153,35 @@ iter cin cout qi eo mng proxy = do
       ackMsg cin tag False
       return ()
     doit mi rraw tag = do
-        let url = case fetch_url mi of Just u -> T.unpack u
-                                       Nothing -> throw WrongFormat
+        let urls = map T.unpack $ getURLs mi
+        --let urls = case fetch_url mi of Just u -> T.unpack u
+        --                               Nothing -> throw WrongFormat
         let proxys = Just $ (\(h,p,_,_) -> T.concat [h, ":", T.pack $ show p]) $ proxy
-        logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
-        tuple <- timeout (15*1000*1000) $ fetch proxy mng url (getHeaders mi)
-        let (code,r,dt,ts,redirect) = case tuple of Just val -> val
-                                                    Nothing -> throw FetchTimeout
-        let mo = MsgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
-                          fetch_status_code = Just code,
-                          fetch_latency = Just dt,
-                          fetch_proxy = proxys,
-                          fetch_time = Just ts,
-                          fetch_redirect = fmap decodeUtf8 redirect }
-        logger $ "Fetched " ++ url ++ ", " ++ (show proxys) ++ ", status " ++ (show $ code) ++ ", latency " ++ (show dt)
-                            ++ ", redirect " ++ (show redirect)
+        mo <- mapM (\url -> do
+          logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
+          tuple <- timeout (15*1000*1000) $ fetch proxy mng url (getHeaders mi)
+          let (code,r,dt,ts,redirect) = case tuple of Just val -> val
+                                                      Nothing -> throw FetchTimeout
+          let moo = MsgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
+                             fetch_status_code = Just code,
+                             fetch_latency = Just dt,
+                             fetch_proxy = proxys,
+                             fetch_time = Just ts,
+                             fetch_redirect = fmap decodeUtf8 redirect,
+                             fetch_response_array = Nothing }
+          logger $ "Fetched " ++ url ++ ", " ++ (show proxys) ++ ", status " ++ (show $ code) ++ ", latency " ++ (show dt)
+                              ++ ", redirect " ++ (show redirect)
+          return moo) urls
+        let (code,mout)= case mo of m:[] -> (fetch_status_code m, m) 
+                                    m:tl -> (fetch_status_code m, MsgOut { fetch_response_array = Just mo } )
         let rk = T.concat [fetch_routing_key mi, ":", T.pack $ show code]
         let msg = newMsg { msgBody = encode $ copyFields (toJSON mo) (fromJust $ decode rraw) } -- TODO: Improve that
         case code of
-          c | c==200 || c==404 -> do              
+          Just c | c==200 || c==404 -> do              
             publishMsg cout eo rk msg
             logger ("Publishing with key " ++ (show rk))
             ack tag
-          c -> do -- Retry
+          Just c -> do -- Retry
             logger ("Rejecting message, code " ++ (show c))
             reject tag
 

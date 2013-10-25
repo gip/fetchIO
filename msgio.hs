@@ -59,7 +59,8 @@ data MsgOut = MsgOut {
   fetch_status_code :: Maybe Int,
   fetch_proxy :: Maybe Text,
   fetch_time :: Maybe Integer,
-  fetch_redirect :: Maybe Text
+  fetch_redirect :: Maybe Text,
+  fetch_response_array :: Maybe [MsgOut]
 } deriving(Generic, Show)
 
 instance ToJSON MsgOut
