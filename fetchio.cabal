@@ -1,0 +1,35 @@
+name:            fetchio
+version:         0.2
+license:         BSD3
+license-file:    LICENSE
+author:          Gilles Pirio <g36130@gmail.com>
+maintainer:      Michael Snoyman <g36130@gmail.com>
+synopsis:        
+description:
+category:        Web
+stability:       Stable
+cabal-version:   >= 1.8
+build-type:      Simple
+homepage:        https://github.com/gip/fetchio
+
+
+
+
+
+
+Executable fetchio
+  Main-is:             fetchio.hs
+  hs-source-dirs:      .
+  other-modules:       Http, MsgIO
+  build-depends: base, stm, conduit, tls, network, old-locale, old-time, text, case-insensitive
+               , unordered-containers, zlib, ghc-prim, base64-bytestring
+               , bytestring            >= 0.10.4.0
+               , HTTP                  >= 4000.2.8
+               , http-types            >= 0.8.2
+               , http-conduit          >= 1.9.5.1
+               , aeson                 >= 0.6.2.1
+               , amqp                  >= 0.7.0
+  ghc-options:         
+  extensions: DeriveDataTypeable DoAndIfThenElse OverloadedStrings ScopedTypeVariables 
+
+
