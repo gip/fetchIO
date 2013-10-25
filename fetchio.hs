@@ -64,6 +64,8 @@ main = do
 start cfg = do 
   tchan <- atomically $ newTChan
   mapM_ (startP tchan) $ pipelines cfg
+  waitFor tchan
+  return () -- Dead
   where
     allHost hg = map getHostInfo (hosts (fromJust $ getHostGroup cfg hg))
     firstHost hg = getHostInfo $ (Prelude.head $ hosts (fromJust $ getHostGroup cfg hg))
@@ -72,8 +74,7 @@ start cfg = do
       let out_c = firstHost (amqp_out_hosts pipe)
       let h = allHost (http_hosts pipe)
       mapM_ (forkIO . simpleFetch tc in_c out_c (amqp_in_queue pipe) (amqp_out_exchange pipe) (http_min_delay pipe)) h
-      waitFor tc
-      return () -- Dead
+      return ()
 
 waitFor tc = do 
   threadDelay 100000
