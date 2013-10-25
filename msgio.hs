@@ -55,24 +55,28 @@ instance ToJSON MString where
 
 data MsgOut = MsgOut {
   fetch_data :: Maybe MString,
+  fetch_data_1 :: Maybe MString,
+  fetch_data_2 :: Maybe MString,
+  fetch_data_3 :: Maybe MString, 
   fetch_latency :: Maybe Int,
   fetch_status_code :: Maybe Int,
   fetch_proxy :: Maybe Text,
   fetch_time :: Maybe Integer,
-  fetch_redirect :: Maybe Text,
-  fetch_response_array :: Maybe [MsgOut]
+  fetch_redirect :: Maybe Text
 } deriving(Generic, Show)
 
 instance ToJSON MsgOut
 
 msgOut = MsgOut {
   fetch_data = Nothing,
+  fetch_data_1 = Nothing,
+  fetch_data_2 = Nothing,
+  fetch_data_3 = Nothing,
   fetch_latency = Nothing,
   fetch_status_code = Nothing,
   fetch_proxy = Nothing,
   fetch_time = Nothing,
-  fetch_redirect = Nothing,
-  fetch_response_array = Nothing
+  fetch_redirect = Nothing
 }
 
 

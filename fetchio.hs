@@ -162,18 +162,18 @@ iter cin cout qi eo mng proxy = do
           tuple <- timeout (15*1000*1000) $ fetch proxy mng url (getHeaders mi)
           let (code,r,dt,ts,redirect) = case tuple of Just val -> val
                                                       Nothing -> throw FetchTimeout
-          let moo = MsgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
+          let moo = msgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
                              fetch_status_code = Just code,
                              fetch_latency = Just dt,
                              fetch_proxy = proxys,
                              fetch_time = Just ts,
-                             fetch_redirect = fmap decodeUtf8 redirect,
-                             fetch_response_array = Nothing }
+                             fetch_redirect = fmap decodeUtf8 redirect }
           logger $ "Fetched " ++ url ++ ", " ++ (show proxys) ++ ", status " ++ (show $ code) ++ ", latency " ++ (show dt)
                               ++ ", redirect " ++ (show redirect)
           return moo) urls
         let (code,mout)= case mo of m:[] -> (fetch_status_code m, m) 
-                                    m:tl -> (fetch_status_code m, msgOut { fetch_response_array = Just mo } )
+                                    m:m1:[] -> (fetch_status_code m, m { fetch_data_1 = fetch_data m1 } )
+                                    m:m1:m2:[] -> (fetch_status_code m, m { fetch_data_1 = fetch_data m1, fetch_data_2 = fetch_data m2 } )
         let rk = T.concat [fetch_routing_key mi, ":", T.pack $ show (fromJust code)]
         let msg = newMsg { msgBody = encode $ copyFields (toJSON mout) (fromJust $ decode rraw) } -- TODO: Improve that
         case code of
