@@ -15,6 +15,7 @@ import Data.Typeable
 import System.Time
 import System.Locale
 import Network
+import Network.TLS
 import Network.AMQP
 import Network.AMQP.Types
 import Data.Conduit
@@ -113,7 +114,7 @@ simpleFetch tchan
   where
     proxy= (pn, pp, liftM encodeUtf8 puser, liftM encodeUtf8 ppass)
     loop0 chan chano = forever $ do
-      mng <- newManager def 
+      mng <- newManager $ def { managerCheckCerts = \ _ _ _-> return CertificateUsageAccept }
       logger ("Pipeline ready with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy)) 
       catches (loop chan chano mng) [Handler (\e -> do { putStrLn $ show (e::FetchTimeout); closeManager mng })]
     loop c co mng = forever $ do
@@ -143,7 +144,7 @@ iter cin cout qi eo mng proxy = do
     handlerHttpE (TlsException s) = do
       putStrLn $ (show s)
       return True
-    handlerHttpE (HandshakeFailed) = do
+    handlerHttpE (C.HandshakeFailed) = do
       return True
     handlerHttpE e = do
       putStrLn $ (show e) ++ " " ++ (show proxy)
