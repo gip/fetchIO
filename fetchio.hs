@@ -73,7 +73,7 @@ start cfg = do
     startP tc pipe = do
       let in_c = firstHost (amqp_in_hosts pipe)
       let out_c = firstHost (amqp_out_hosts pipe)
-      let h = allHost (http_hosts pipe)
+      let h = Prelude.concatMap allHost (http_hosts pipe)
       mapM_ (forkIO . simpleFetch tc in_c out_c (amqp_in_queue pipe) (amqp_out_exchange pipe) (http_min_delay pipe)) h
       return ()
 
