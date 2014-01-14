@@ -71,10 +71,18 @@ start cfg = do
     allHost hg = map getHostInfo (hosts (fromJust $ getHostGroup cfg hg))
     firstHost hg = getHostInfo $ (Prelude.head $ hosts (fromJust $ getHostGroup cfg hg))
     startP tc pipe = do
-      let in_c = firstHost (amqp_in_hosts pipe)
-      let out_c = firstHost (amqp_out_hosts pipe)
+      let in_c@(in_h, in_p, in_login, in_passw) = firstHost (amqp_in_hosts pipe)
+      let out_c@(out_h, out_p, out_login, out_passw) = firstHost (amqp_out_hosts pipe)
       let h = Prelude.concatMap allHost (http_hosts pipe)
-      mapM_ (forkIO . simpleFetch tc in_c out_c (amqp_in_queue pipe) (amqp_out_exchange pipe) (http_min_delay pipe)) h
+      conn <- openConnection (T.unpack in_h) "/" (fromMaybe "" in_login) (fromMaybe "" in_passw)
+      chan <- openChannel conn
+      chano <- if in_c == out_c 
+               then
+                 openChannel conn  -- We create a new channel
+               else do
+                 conno <- openConnection (T.unpack out_h) "/" (fromMaybe "" out_login) (fromMaybe "" out_passw)
+                 openChannel conno      
+      mapM_ (forkIO . simpleFetch tc chan chano (amqp_in_queue pipe) (amqp_out_exchange pipe) (http_min_delay pipe)) h
       return ()
 
 waitFor tc = do 
@@ -93,22 +101,16 @@ waitFor tc = do
 
 
 simpleFetch tchan
-            in_c@(in_h, in_p, in_login, in_passw)       -- AMQP host
-            out_c@(out_h, out_p, out_login, out_passw)
+            chan
+            chano
+            --in_c@(in_h, in_p, in_login, in_passw)       -- AMQP host
+            --out_c@(out_h, out_p, out_login, out_passw)
             qin                    -- Queue in
             eout                   -- Queue out
             wait
             (pn,pp,puser,ppass)    -- Proxy host (Maybe)
             = do
   logger ("Building pipeline with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy))
-  conn <- openConnection (T.unpack in_h) "/" (fromMaybe "" in_login) (fromMaybe "" in_passw)
-  chan <- openChannel conn
-  chano <- if in_c == out_c 
-           then
-             openChannel conn  -- We create a new channel
-           else do
-           	  conno <- openConnection (T.unpack out_h) "/" (fromMaybe "" out_login) (fromMaybe "" out_passw)
-           	  openChannel conno
   loop0 chan chano
   return ()
   where
