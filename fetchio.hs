@@ -32,6 +32,7 @@ import Control.Applicative ((<$>))
 import Control.Monad(forever)
 import System.Environment
 import System.Timeout
+import System.Random
 
 
 data Level = Err | Info deriving (Show)
@@ -111,9 +112,15 @@ simpleFetch tchan
             (pn,pp,puser,ppass)    -- Proxy host (Maybe)
             = do
   logger ("Building pipeline with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy))
+  when(isJust wait) $ do
+    r <- getStdRandom (randomR (0,99))
+    let w = waitMs * r `quot` 100
+    logger("Pipeline will wait for " ++ (show w) ++ "s")
+    threadDelay $ 1000 * w
   loop0 chan chano
   return ()
   where
+    waitMs= fromJust wait
     proxy= (pn, pp, liftM encodeUtf8 puser, liftM encodeUtf8 ppass)
     loop0 chan chano = forever $ do
       mng <- newManager $ def { managerCheckCerts = \ _ _ _-> return CertificateUsageAccept }
@@ -121,7 +128,7 @@ simpleFetch tchan
       catches (loop chan chano mng) [Handler (\e -> do { putStrLn $ show (e::FetchTimeout); closeManager mng })]
     loop c co mng = forever $ do
         iter c co qin eout mng proxy
-        when(isJust wait) (threadDelay $ 1000 * fromJust wait)
+        when(isJust wait) (threadDelay $ 1000 * waitMs)
 
 
 iter cin cout qi eo mng proxy = do
