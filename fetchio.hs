@@ -32,7 +32,6 @@ import Control.Applicative ((<$>))
 import Control.Monad(forever)
 import System.Environment
 import System.Timeout
-import System.Random
 
 
 data Level = Err | Info deriving (Show)
@@ -83,7 +82,7 @@ start cfg = do
                else do
                  conno <- openConnection (T.unpack out_h) "/" (fromMaybe "" out_login) (fromMaybe "" out_passw)
                  openChannel conno      
-      mapM_ (forkIO . simpleFetch tc chan chano (amqp_in_queue pipe) (amqp_out_exchange pipe) (http_min_delay pipe)) h
+      mapM_ (forkIO . simpleFetch tc chan chano (amqp_in_queue pipe) (amqp_out_exchange pipe) (http_min_delay pipe) (http_start_delay pipe)) (Prelude.zip [1..] h)
       return ()
 
 waitFor tc = do 
@@ -104,19 +103,17 @@ waitFor tc = do
 simpleFetch tchan
             chan
             chano
-            --in_c@(in_h, in_p, in_login, in_passw)       -- AMQP host
-            --out_c@(out_h, out_p, out_login, out_passw)
-            qin                    -- Queue in
-            eout                   -- Queue out
+            qin                        -- Queue in
+            eout                       -- Queue out
             wait
-            (pn,pp,puser,ppass)    -- Proxy host (Maybe)
+            start_wait
+            (i,(pn,pp,puser,ppass))    -- Proxy host (Maybe)
             = do
   logger ("Building pipeline with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy))
-  when(isJust wait) $ do
-    r <- getStdRandom (randomR (0,99))
-    let w = (waitMs * r) `quot` 100
-    logger("Pipeline will wait for " ++ (show w) ++ "ms")
-    threadDelay $ 1000 * w
+  when(isJust start_wait) $ do
+    let ws = (fromJust start_wait) * i
+    logger("Pipeline will wait for " ++ (show ws) ++ "s")
+    threadDelay $ 1000 * 1000 * ws
   loop0 chan chano
   return ()
   where

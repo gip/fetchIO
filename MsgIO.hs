@@ -112,7 +112,8 @@ data CfgPipeline = CfgPipeline {
   amqp_in_queue :: Text,
   amqp_out_exchange :: Text,
   http_hosts :: [Text],
-  http_min_delay :: Maybe Int
+  http_min_delay :: Maybe Int,
+  http_start_delay :: Maybe Int
 } deriving(Generic, Show)
 
 instance FromJSON CfgPipeline
