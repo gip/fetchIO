@@ -114,8 +114,8 @@ simpleFetch tchan
   logger ("Building pipeline with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy))
   when(isJust wait) $ do
     r <- getStdRandom (randomR (0,99))
-    let w = waitMs * r `quot` 100
-    logger("Pipeline will wait for " ++ (show w) ++ "s")
+    let w = (waitMs * r) `quot` 100
+    logger("Pipeline will wait for " ++ (show w) ++ "ms")
     threadDelay $ 1000 * w
   loop0 chan chano
   return ()
