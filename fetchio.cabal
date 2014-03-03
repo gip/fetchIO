@@ -21,7 +21,7 @@ Executable fetchio
   Main-is:             fetchio.hs
   hs-source-dirs:      .
   other-modules:       Http, MsgIO
-  build-depends: base, stm, conduit, tls, network, old-locale, old-time, text, case-insensitive
+  build-depends: base, stm, conduit, tls, network, connection, old-locale, old-time, text, case-insensitive
                , unordered-containers, zlib, ghc-prim, base64-bytestring, random
                , bytestring            >= 0.10.4.0
                , HTTP                  >= 4000.2.8

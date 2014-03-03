@@ -5,6 +5,7 @@ module MsgIO where
 
 import Data.List as L
 import Data.Text (Text,strip,splitOn)
+import Data.Text.Encoding
 import Data.Aeson
 import Data.Maybe
 import qualified Data.HashMap.Strict as HM
@@ -48,6 +49,9 @@ getURLs mi =
 -- 
 
 data MString = MString (Either String BL.ByteString) deriving(Show)
+
+instance ToJSON (B.ByteString) where
+  toJSON bs = toJSON (decodeUtf8 bs)
 
 instance ToJSON MString where
   toJSON (MString (Right t)) = toJSON $ (B64.encode (B.concat (BL.toChunks (Z.compress t))))
