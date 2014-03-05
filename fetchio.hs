@@ -11,6 +11,8 @@ import Data.Aeson
 import Data.Text as T hiding(map)
 import Data.Text.Encoding
 import Data.Typeable
+import Data.String.Conversions
+
 --import Data.Text.Lazy.Encoding
 import System.Time
 import System.Locale
@@ -75,16 +77,19 @@ start cfg = do
       let in_c@(in_h, in_p, in_login, in_passw) = firstHost (amqp_in_hosts pipe)
       let out_c@(out_h, out_p, out_login, out_passw) = firstHost (amqp_out_hosts pipe)
       let h = Prelude.concatMap allHost (http_hosts pipe)
-      conn <- openConnection (T.unpack in_h) "/" (fromMaybe "" in_login) (fromMaybe "" in_passw)
+      conn <- openConnection (cs in_h) "/" (fromMaybe "" in_login) (fromMaybe "" in_passw)
       chan <- openChannel conn
       chano <- if in_c == out_c 
                then
                  openChannel conn  -- We create a new channel
                else do
-                 conno <- openConnection (T.unpack out_h) "/" (fromMaybe "" out_login) (fromMaybe "" out_passw)
+                 conno <- openConnection (cs out_h) "/" (fromMaybe "" out_login) (fromMaybe "" out_passw)
                  openChannel conno      
-      mapM_ (forkIO . simpleFetch tc chan chano (amqp_in_queue pipe) (amqp_out_exchange pipe) (http_min_delay pipe) (http_start_delay pipe)) (Prelude.zip [1..] h)
+      let f = \a b -> forkIO $ simpleFetch tc chan chano (amqp_in_queue pipe) (amqp_out_exchange pipe) (http_min_delay pipe) (http_start_delay pipe) a b
+      mapIM_ f h
       return ()
+
+mapIM_ f l = mapM_ (uncurry f) (Prelude.zip [0..] l) 
 
 waitFor tc = do 
   threadDelay 100000
@@ -108,7 +113,8 @@ simpleFetch tchan
             eout                       -- Queue out
             wait
             start_wait
-            (i,(pn,pp,puser,ppass))    -- Proxy host (Maybe)
+            i                          -- Index
+            (pn,pp,puser,ppass)        -- Proxy host (Maybe)
             = do
   logger ("Building pipeline with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy))
   when(isJust start_wait) $ do
@@ -162,10 +168,10 @@ iter cin cout qi eo mng proxy = do
       ackMsg cin tag False
       return ()
     doit mi rraw tag = do
-        let urls = map T.unpack $ getURLs mi
+        let urls = map cs $ getURLs mi
         --let urls = case fetch_url mi of Just u -> T.unpack u
         --                               Nothing -> throw WrongFormat
-        let proxys = Just $ (\(h,p,_,_) -> T.concat [h, ":", T.pack $ show p]) $ proxy
+        let proxys = Just $ (\(h,p,_,_) -> T.concat [h, ":", cs $ show p]) $ proxy
         mo <- mapM (\url -> do
           logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
           tuple <- timeout (15*1000*1000) $ fetch proxy mng url (getHeaders mi)
@@ -183,7 +189,7 @@ iter cin cout qi eo mng proxy = do
         let (code,mout)= case mo of m:[] -> (fetch_status_code m, m) 
                                     m:m1:[] -> (fetch_status_code m, m { fetch_data_1 = fetch_data m1 } )
                                     m:m1:m2:[] -> (fetch_status_code m, m { fetch_data_1 = fetch_data m1, fetch_data_2 = fetch_data m2 } )
-        let rk = T.concat [fetch_routing_key mi, ":", T.pack $ show (fromJust code)]
+        let rk = T.concat [fetch_routing_key mi, ":", cs $ show (fromJust code)]
         let msg = newMsg { msgBody = encode $ copyFields (toJSON mout) (fromJust $ decode rraw) } -- TODO: Improve that
         case code of
           Just c | c==200 || c==404 || c==503 || c==403 -> do              
