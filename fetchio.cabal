@@ -20,7 +20,7 @@ homepage:        https://github.com/gip/fetchio
 Executable fetchio
   Main-is:             fetchio.hs
   hs-source-dirs:      .
-  other-modules:       Http, MsgIO
+  other-modules:       Http, MsgIO, Amqp
   build-depends: base, stm, conduit, tls, network, connection, old-locale, old-time, text, case-insensitive
                , unordered-containers, zlib, ghc-prim, base64-bytestring, random
                , bytestring            >= 0.10.4.0
@@ -31,6 +31,6 @@ Executable fetchio
                , amqp                  >= 0.7.0
                , string-conversions    >= 0.3.0.2
   ghc-options:         
-  extensions: FlexibleInstances DeriveDataTypeable DoAndIfThenElse OverloadedStrings ScopedTypeVariables 
+  extensions: FunctionalDependencies MultiParamTypeClasses LambdaCase FlexibleInstances DeriveDataTypeable DoAndIfThenElse OverloadedStrings ScopedTypeVariables 
 
 

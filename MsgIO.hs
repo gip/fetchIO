@@ -45,6 +45,16 @@ getURLs mi =
   if(isJust $ fetch_url mi) then (fromJust $ fetch_url mi) : []
   	                        else filter (\s -> s /= "") $ map strip (splitOn " " (fromJust $ fetch_urls mi))
 
+
+class Monad m => Connector m a c | m a -> c where
+  newConnection :: a -> m c 
+
+class (Monad m, Connector m a c)  => Source m a c r | m c r -> a where
+  pop :: c -> m (Maybe (r, Bool -> m ()))
+
+class (Monad m, Connector m a c) => Dest m a c k r | m c r k -> a where
+  push :: c -> k -> r -> m ()
+
 --
 -- Output Message
 -- 

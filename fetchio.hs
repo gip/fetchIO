@@ -4,6 +4,7 @@ module Main where
 
 import MsgIO
 import Http
+import Amqp as A
 
 import Data.Text.Encoding
 import Data.Maybe
@@ -45,6 +46,7 @@ data WrongFormat = WrongFormat deriving (Show, Typeable)
 instance Exception FetchTimeout
 instance Exception WrongFormat
 
+
 output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
   where p Err = "error"
         p Info = "info"
@@ -77,15 +79,11 @@ start cfg = do
       let in_c@(in_h, in_p, in_login, in_passw) = firstHost (amqp_in_hosts pipe)
       let out_c@(out_h, out_p, out_login, out_passw) = firstHost (amqp_out_hosts pipe)
       let h = Prelude.concatMap allHost (http_hosts pipe)
-      conn <- openConnection (cs in_h) "/" (fromMaybe "" in_login) (fromMaybe "" in_passw)
-      chan <- openChannel conn
-      chano <- if in_c == out_c 
-               then
-                 openChannel conn  -- We create a new channel
-               else do
-                 conno <- openConnection (cs out_h) "/" (fromMaybe "" out_login) (fromMaybe "" out_passw)
-                 openChannel conno      
-      let f = \a b -> forkIO $ simpleFetch tc chan chano (amqp_in_queue pipe) (amqp_out_exchange pipe) (http_min_delay pipe) (http_start_delay pipe) a b
+      conn <- newConnection $ Endpoint { A.host= cs in_h, A.user= fromMaybe "" in_login, 
+                              A.password= fromMaybe "" in_passw, A.queueOrExch= amqp_in_queue pipe }
+      conno <- newConnection $ Endpoint { A.host= cs out_h, A.user= fromMaybe "" out_login, 
+                              A.password= fromMaybe "" out_passw, A.queueOrExch= amqp_out_exchange pipe }
+      let f = \a b -> forkIO $ simpleFetch tc (pop conn) (push conno) (http_min_delay pipe) (http_start_delay pipe) a b
       mapIM_ f h
       return ()
 
@@ -107,47 +105,46 @@ waitFor tc = do
 
 
 simpleFetch tchan
-            chan
-            chano
-            qin                        -- Queue in
-            eout                       -- Queue out
+            fpop
+            fpush
             wait
             start_wait
             i                          -- Index
             (pn,pp,puser,ppass)        -- Proxy host (Maybe)
             = do
-  logger ("Building pipeline with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy))
+  --logger ("Building pipeline with params: " ++ (show chan) ++ " - " ++ (show chano) ++ " - " ++ (show proxy))
   when(isJust start_wait) $ do
     let ws = (fromJust start_wait) * i
     logger("Pipeline will wait for " ++ (show ws) ++ "s")
     threadDelay $ 1000 * 1000 * ws
-  loop0 chan chano
+  loop0 fpop fpush
   return ()
   where
     waitMs= fromJust wait
     proxy= (pn, pp, liftM encodeUtf8 puser, liftM encodeUtf8 ppass)
-    loop0 chan chano = forever $ do
+    loop0 fpop fpush = forever $ do
       -- mng <- newManager $ def { managerCheckCerts = \ _ _ _-> return CertificateUsageAccept }
-      mng <- newManager $ mkManagerSettings settings Nothing
-      logger ("Pipeline ready with params: " ++ (show qin) ++ " - " ++ (show eout) ++ " - " ++ (show proxy)) 
-      catches (loop chan chano mng) [Handler (\e -> do { putStrLn $ show (e::FetchTimeout); closeManager mng })]
-    loop c co mng = forever $ do
-        iter c co qin eout mng proxy
+      mng <- C.newManager $ mkManagerSettings settings Nothing
+      --logger ("Pipeline ready with params: " ++ (show chan) ++ " - " ++ (show chano) ++ " - " ++ (show proxy)) 
+      catches (loop fpop fpush mng) [Handler (\e -> do { putStrLn $ show (e::FetchTimeout); closeManager mng })]
+    loop fpop fpusf mng = forever $ do
+        iter fpop fpush mng proxy
         when(isJust wait) (threadDelay $ 1000 * waitMs)
     settings= TLSSettingsSimple { settingDisableCertificateValidation= True }
 
-iter cin cout qi eo mng proxy = do
-  r <- pop cin qi
+iter fpop fpush mng proxy = do
+  r <- fpop
   when(isJust r) $ do 
-    let (mi,tag, rraw) = fromJust r
+    let (mi,ackOrNack) = fromJust r
     --catchAny (doit' mi rraw tag) (\e -> do { putStrLn $ show e ;reject tag } )
-    doit' mi rraw tag
+    doit' mi ackOrNack
   return ()
   where
-    doit' mi rraw tag = catches (doit mi rraw tag) (handlers tag)
-    handlerWrap tag h action = Handler (\e -> do
+    doit' mi ackOrNack = catches (doit mi ackOrNack) (handlers ackOrNack)
+    handlerWrap ackOrNack h action = Handler (\e -> do
       b <- h e
-      if b then ack tag else reject tag
+      --if b then ack tag else reject tag
+      ackOrNack b
       action
       )
     handlers tag = [ handlerWrap tag handlerHttpE (return ()), handlerWrap tag (\(e::FetchTimeout) -> return False) (throw FetchTimeout),
@@ -163,51 +160,57 @@ iter cin cout qi eo mng proxy = do
     handlerHttpE e = do
       putStrLn $ (show e) ++ " " ++ (show proxy)
       return False
-    reject tag = rejectMsg cin tag True
-    ack tag = do
-      ackMsg cin tag False
-      return ()
-    doit mi rraw tag = do
+    doit mi ackOrNack = do
         let urls = map cs $ getURLs mi
-        --let urls = case fetch_url mi of Just u -> T.unpack u
-        --                               Nothing -> throw WrongFormat
         let proxys = Just $ (\(h,p,_,_) -> T.concat [h, ":", cs $ show p]) $ proxy
-        mo <- mapM (\url -> do
-          logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
-          tuple <- timeout (15*1000*1000) $ fetch proxy mng url (getHeaders mi)
-          let (code,r,dt,ts,redirect) = case tuple of Just val -> val
-                                                      Nothing -> throw FetchTimeout
-          let moo = msgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
-                             fetch_status_code = Just code,
-                             fetch_latency = Just dt,
-                             fetch_proxy = proxys,
-                             fetch_time = Just ts,
-                             fetch_redirect = fmap decodeUtf8 redirect }
-          logger $ "Fetched " ++ url ++ ", " ++ (show proxys) ++ ", status " ++ (show $ code) ++ ", latency " ++ (show dt)
-                              ++ ", redirect " ++ (show redirect)
-          return moo) urls
+        --let f url = do
+        --  logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
+        --  tuple <- timeout (15*1000*1000) $ fetch proxy mng url (getHeaders mi)
+        --  let (code,r,dt,ts,redirect) = case tuple of Just val -> val
+        --                                              Nothing -> throw FetchTimeout
+        --  let moo = msgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
+        --                     fetch_status_code = Just code,
+        --                     fetch_latency = Just dt,
+        --                     fetch_proxy = proxys,
+        --                     fetch_time = Just ts,
+        --                     fetch_redirect = fmap decodeUtf8 redirect }
+        --  logger $ "Fetched " ++ url ++ ", " ++ (show proxys) ++ ", status " ++ (show $ code) ++ ", latency " ++ (show dt)
+        --                      ++ ", redirect " ++ (show redirect)
+        --  return moo
+        mo <- mapM (fetch' proxys (getHeaders mi)) urls
         let (code,mout)= case mo of m:[] -> (fetch_status_code m, m) 
                                     m:m1:[] -> (fetch_status_code m, m { fetch_data_1 = fetch_data m1 } )
                                     m:m1:m2:[] -> (fetch_status_code m, m { fetch_data_1 = fetch_data m1, fetch_data_2 = fetch_data m2 } )
         let rk = T.concat [fetch_routing_key mi, ":", cs $ show (fromJust code)]
-        let msg = newMsg { msgBody = encode $ copyFields (toJSON mout) (fromJust $ decode rraw) } -- TODO: Improve that
+        --let msg = newMsg { msgBody = encode $ copyFields (toJSON mout) (fromJust $ decode rraw) } -- TODO: Improve that
+        -- TODO: copy all fields 
+        let msg = mout
+        -- TODO
         case code of
           Just c | c==200 || c==404 || c==503 || c==403 -> do              
-            publishMsg cout eo rk msg
+            --publishMsg cout eo rk msg
+            fpush rk msg
             logger ("Publishing with key " ++ (show rk))
-            ack tag
+            --ack tag
+            ackOrNack True
           Just c -> do -- Retry
             logger ("Rejecting message, code " ++ (show c))
-            reject tag
-
--- Pop a message from AMQP
-pop c q = do
-  m0 <- getMsg c Ack q
-  let r = case m0 of Just(m) -> let (msg,tag) = (\ (a,b) -> (msgBody a, envDeliveryTag b)) m in
-                                Just (fromJust (decode msg),tag, msg)
-                     Nothing -> Nothing
-  return r
-
+            --reject tag
+            ackOrNack False
+    fetch' proxys headers url = do
+      logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
+      tuple <- timeout (15*1000*1000) $ fetch proxy mng url headers
+      let (code,r,dt,ts,redirect) = case tuple of Just val -> val
+                                                  Nothing -> throw FetchTimeout
+      let moo = msgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
+                         fetch_status_code = Just code,
+                         fetch_latency = Just dt,
+                         fetch_proxy = proxys,
+                         fetch_time = Just ts,
+                         fetch_redirect = fmap decodeUtf8 redirect }
+      logger $ "Fetched " ++ url ++ ", " ++ (show proxys) ++ ", status " ++ (show $ code) ++ ", latency " ++ (show dt)
+                          ++ ", redirect " ++ (show redirect)
+      return moo    
 
 --
 -- Catching all exceptions
