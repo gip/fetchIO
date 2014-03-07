@@ -23,20 +23,24 @@ import qualified Data.CaseInsensitive as CI
 --
 -- Input Message
 --
-data Header a = Header { field :: a, value :: a } deriving (Generic, Show)
+data Header = Header { field :: Text, value :: Text } deriving (Generic, Show)
 
-data MsgIn a = MsgIn {
-  fetch_url :: Maybe a,
-  fetch_urls :: Maybe a,
-  fetch_headers :: Maybe [Header a],
-  fetch_routing_key :: a
+data MsgIn = MsgIn {
+  fetch_url :: Maybe Text,
+  fetch_urls :: Maybe Text,
+  fetch_headers :: Maybe [Header],
+  fetch_routing_key :: Text,
+  top_level :: Maybe Value            -- The full input message
 } deriving (Generic, Show)
 
+instance FromJSON Header
+instance FromJSON MsgIn 
+instance ToJSON Header
+instance ToJSON MsgIn
 
-instance FromJSON (Header Text)
-instance FromJSON (MsgIn Text)
-instance ToJSON (Header Text)
-instance ToJSON (MsgIn Text)
+--instance FromJSON MsgIn where
+--  parseJSON j = case (parseJSON j) of Success a -> Success (a { _all = parseJSON j })
+--                                      e -> e
 
 getHeaders mi = map (\h -> (CI.mk (encodeUtf8 $ field h), encodeUtf8 $ value h)) (case fetch_headers mi of Nothing -> [] 
                                                                                                            Just a -> a)
@@ -141,6 +145,6 @@ instance FromJSON CfgTop
 getHostGroup :: CfgTop -> Text -> Maybe CfgHostGroup
 getHostGroup cfg g = join (liftM (L.find (\hg -> MsgIO.group hg == g)) $ groups cfg)
   
-copyFields (Object o0) (Object o1) = Object (HM.union o0 o1)
+--copyFields (Object o0) (Object o1) = Object (HM.union o0 o1)
   
 

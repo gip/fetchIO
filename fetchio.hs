@@ -13,6 +13,7 @@ import Data.Text as T hiding(map)
 import Data.Text.Encoding
 import Data.Typeable
 import Data.String.Conversions
+import qualified Data.HashMap.Strict as HM
 
 --import Data.Text.Lazy.Encoding
 import System.Time
@@ -113,6 +114,7 @@ simpleFetch tchan
             (pn,pp,puser,ppass)        -- Proxy host (Maybe)
             = do
   --logger ("Building pipeline with params: " ++ (show chan) ++ " - " ++ (show chano) ++ " - " ++ (show proxy))
+  logger "New pipeline"
   when(isJust start_wait) $ do
     let ws = (fromJust start_wait) * i
     logger("Pipeline will wait for " ++ (show ws) ++ "s")
@@ -123,14 +125,16 @@ simpleFetch tchan
     waitMs= fromJust wait
     proxy= (pn, pp, liftM encodeUtf8 puser, liftM encodeUtf8 ppass)
     loop0 fpop fpush = forever $ do
-      -- mng <- newManager $ def { managerCheckCerts = \ _ _ _-> return CertificateUsageAccept }
       mng <- C.newManager $ mkManagerSettings settings Nothing
       --logger ("Pipeline ready with params: " ++ (show chan) ++ " - " ++ (show chano) ++ " - " ++ (show proxy)) 
+      logger "Pipeline ready"
       catches (loop fpop fpush mng) [Handler (\e -> do { putStrLn $ show (e::FetchTimeout); closeManager mng })]
     loop fpop fpusf mng = forever $ do
         iter fpop fpush mng proxy
         when(isJust wait) (threadDelay $ 1000 * waitMs)
-    settings= TLSSettingsSimple { settingDisableCertificateValidation= True }
+    settings= TLSSettingsSimple { settingDisableCertificateValidation= True,
+                                  settingDisableSession= True,
+                                  settingUseServerName= True }
 
 iter fpop fpush mng proxy = do
   r <- fpop
@@ -143,7 +147,6 @@ iter fpop fpush mng proxy = do
     doit' mi ackOrNack = catches (doit mi ackOrNack) (handlers ackOrNack)
     handlerWrap ackOrNack h action = Handler (\e -> do
       b <- h e
-      --if b then ack tag else reject tag
       ackOrNack b
       action
       )
@@ -163,40 +166,21 @@ iter fpop fpush mng proxy = do
     doit mi ackOrNack = do
         let urls = map cs $ getURLs mi
         let proxys = Just $ (\(h,p,_,_) -> T.concat [h, ":", cs $ show p]) $ proxy
-        --let f url = do
-        --  logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
-        --  tuple <- timeout (15*1000*1000) $ fetch proxy mng url (getHeaders mi)
-        --  let (code,r,dt,ts,redirect) = case tuple of Just val -> val
-        --                                              Nothing -> throw FetchTimeout
-        --  let moo = msgOut { fetch_data = if(code==200) then Just $ MString (Right $ responseBody r) else Nothing, 
-        --                     fetch_status_code = Just code,
-        --                     fetch_latency = Just dt,
-        --                     fetch_proxy = proxys,
-        --                     fetch_time = Just ts,
-        --                     fetch_redirect = fmap decodeUtf8 redirect }
-        --  logger $ "Fetched " ++ url ++ ", " ++ (show proxys) ++ ", status " ++ (show $ code) ++ ", latency " ++ (show dt)
-        --                      ++ ", redirect " ++ (show redirect)
-        --  return moo
         mo <- mapM (fetch' proxys (getHeaders mi)) urls
         let (code,mout)= case mo of m:[] -> (fetch_status_code m, m) 
                                     m:m1:[] -> (fetch_status_code m, m { fetch_data_1 = fetch_data m1 } )
                                     m:m1:m2:[] -> (fetch_status_code m, m { fetch_data_1 = fetch_data m1, fetch_data_2 = fetch_data m2 } )
         let rk = T.concat [fetch_routing_key mi, ":", cs $ show (fromJust code)]
-        --let msg = newMsg { msgBody = encode $ copyFields (toJSON mout) (fromJust $ decode rraw) } -- TODO: Improve that
-        -- TODO: copy all fields 
-        let msg = mout
-        -- TODO
+        let msg = merge (toJSON mout) (top_level mi) -- Keep the fields from MsgIn
         case code of
           Just c | c==200 || c==404 || c==503 || c==403 -> do              
-            --publishMsg cout eo rk msg
             fpush rk msg
             logger ("Publishing with key " ++ (show rk))
-            --ack tag
             ackOrNack True
           Just c -> do -- Retry
             logger ("Rejecting message, code " ++ (show c))
-            --reject tag
             ackOrNack False
+    merge (Object o0) (Just (Object o1)) = Object (HM.union o0 o1)
     fetch' proxys headers url = do
       logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
       tuple <- timeout (15*1000*1000) $ fetch proxy mng url headers
