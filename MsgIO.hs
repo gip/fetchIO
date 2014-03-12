@@ -1,7 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
-
 module MsgIO where
+
+import Types
 
 import Data.List as L
 import Data.Text (Text,strip,splitOn)
@@ -23,7 +22,7 @@ import qualified Data.CaseInsensitive as CI
 --
 -- Input Message
 --
-data Header = Header { field :: Text, value :: Text } deriving (Generic, Show)
+--data Header = Header { field :: Text, value :: Text } deriving (Generic, Show)
 
 data MsgIn = MsgIn {
   fetch_url :: Maybe Text,
@@ -38,12 +37,8 @@ instance FromJSON MsgIn
 instance ToJSON Header
 instance ToJSON MsgIn
 
---instance FromJSON MsgIn where
---  parseJSON j = case (parseJSON j) of Success a -> Success (a { _all = parseJSON j })
---                                      e -> e
-
-getHeaders mi = map (\h -> (CI.mk (encodeUtf8 $ field h), encodeUtf8 $ value h)) (case fetch_headers mi of Nothing -> [] 
-                                                                                                           Just a -> a)
+getHeaders mi = case fetch_headers mi of Nothing -> [] 
+                                         Just a -> a
 
 getURLs mi =
   if(isJust $ fetch_url mi) then (fromJust $ fetch_url mi) : []
@@ -76,7 +71,7 @@ data MsgOut = MsgOut {
   fetch_data_3 :: Maybe MString, 
   fetch_latency :: Maybe Int,
   fetch_status_code :: Maybe Int,
-  fetch_proxy :: Maybe Text,
+  fetch_proxy :: Maybe Endpoint,
   fetch_time :: Maybe Integer,
   fetch_redirect :: Maybe Text
 } deriving(Generic, Show)
@@ -100,34 +95,28 @@ msgOut = MsgOut {
 -- Config
 --
 
-data CfgHost = CfgHost {
-  host :: Maybe Text,
-  port :: Maybe Int,
-  user :: Maybe Text,
-  password :: Maybe Text
-} deriving(Generic, Show)
-
-instance FromJSON CfgHost
+instance FromJSON Endpoint
+instance ToJSON Endpoint
 
 getHostInfo c = 
   (fromMaybe "localhost" $ host c,
    fromMaybe 80 $ port c,           
-   user c, password c)
+   user c, pass c)
 
 
-data CfgHostGroup =CfgHostGroup {
+data CfgHostGroup = CfgHostGroup {
   group :: Text,
-  hosts :: [CfgHost]
+  hosts :: [Endpoint]
 } deriving(Generic, Show)
 
 instance FromJSON CfgHostGroup
 
 data CfgPipeline = CfgPipeline {
-  amqp_in_hosts :: Text,
-  amqp_out_hosts :: Text,
+  amqp_in_host :: Endpoint,
+  amqp_out_host :: Endpoint,
   amqp_in_queue :: Text,
   amqp_out_exchange :: Text,
-  http_hosts :: [Text],
+  http_proxys :: [Endpoint],
   http_min_delay :: Maybe Int,
   http_start_delay :: Maybe Int
 } deriving(Generic, Show)
@@ -145,6 +134,3 @@ instance FromJSON CfgTop
 getHostGroup :: CfgTop -> Text -> Maybe CfgHostGroup
 getHostGroup cfg g = join (liftM (L.find (\hg -> MsgIO.group hg == g)) $ groups cfg)
   
---copyFields (Object o0) (Object o1) = Object (HM.union o0 o1)
-  
-

@@ -2,26 +2,26 @@
 
 module Amqp where
 
+import Types
+import Ljson
+
 import Data.Maybe
-import Data.Aeson
+--import Data.Aeson
 import Data.Text
+import Data.String.Conversions
 
 import MsgIO hiding (user,host,password)
 import Network.AMQP
 import Network.AMQP.Types
 
-data Endpoint = Endpoint { host :: String, 
-                           user :: Text, 
-                           password :: Text, 
-                           queueOrExch :: Text }
 
-instance Connector IO Endpoint (Channel,Text) where
-  newConnection ep = do
-    conn <- openConnection (host ep) "/" (user ep) (password ep)
+instance Connector IO (Endpoint,Text) (Channel,Text) where
+  newConnection (ep,qe) = do
+    conn <- openConnection (cs $ getHost ep) "/" (fromMaybe "" $ user ep) (fromMaybe "" $ pass ep)
     chan <- openChannel conn
-    return (chan, queueOrExch ep)
+    return (chan, qe)
 
-instance Source IO Endpoint (Channel,Text) MsgIn where
+instance Source IO (Endpoint,Text) (Channel,Text) MsgIn where
   pop (c,q) = do
     m0 <- getMsg c Ack q
     let r = case m0 of Just(m) -> let (msg,tag) = (\ (a,b) -> (msgBody a, envDeliveryTag b)) m in
@@ -34,7 +34,7 @@ ackOrNot chan tag ack = if ack
 	                    then ackMsg chan tag False 
 	                    else rejectMsg chan tag True
 
-instance Dest IO Endpoint (Channel,Text) Text Value where
+instance Dest IO (Endpoint,Text) (Channel,Text) Text Value where
   push (c,e) k msg = do
     publishMsg c e k $ newMsg { msgBody = encode msg }
     return ()
