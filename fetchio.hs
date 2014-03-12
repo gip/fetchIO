@@ -21,6 +21,7 @@ import qualified Data.ByteString.Lazy as BL
 
 import Control.Exception
 import Control.Concurrent
+import GHC.Conc
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TChan
 import Control.Monad(when, liftM)
@@ -67,17 +68,17 @@ main = do
       cfg <- (liftM $ decode) (BL.readFile fi)
       case cfg of 
         Left e -> output Err ("error: "++e)
-        Right cfg -> start cfg
+        Right cfg -> startPipelines cfg
     _ -> output Err "usage: fetchio <configuration file>"
   return ()
 
-start cfg = do 
+startPipelines cfg = do 
   tc <- atomically $ newTChan
-  mapM_ (startP tc) $ pipelines cfg
-  waitFor tc
+  mapM_ (startPipeline tc) $ pipelines cfg
+  startBackground tc
   return () -- Dead
   where
-    startP tc pipe = do
+    startPipeline tc pipe = do
       let ep_in = amqp_in_host pipe
       let ep_out = amqp_out_host pipe
       let h = P.concat $ http_proxys pipe
@@ -85,17 +86,32 @@ start cfg = do
       conno <- newConnection (ep_out,amqp_out_exchange pipe)
       let p = Pipe { pChan = tc, pPop = pop conn, pPush = push conno, pDelay = http_min_delay pipe, 
                      pStartDelay = http_start_delay pipe, pProxy = undefined }
-      --let f = \a b -> forkIO $ simpleFetch tc (pop conn) (push conno) (http_min_delay pipe) (http_start_delay pipe) a b
-      let f = \i proxy -> forkIO $ simpleFetch i (p { pProxy= proxy })
-      mapIM_ f h
-      return ()
+      forkIO $ startPipelineBackground $ map (\(i,proxy) -> (i, Nothing, p { pProxy = proxy } ) ) (P.zip [0..] h) 
 
-mapIM_ f l = mapM_ (uncurry f) (P.zip [0..] l) 
+startPipelineBackground threads = do
+  threads' <- mapM handleThread threads
+  threadDelay 100000
+  startPipelineBackground threads'
+  where
+    handleThread (i,Nothing,p) = start i p
+    handleThread t@(i, Just tid,p) = do
+      status <- threadStatus tid
+      case status of
+        ThreadFinished -> do
+          logger $ "Fetcher " ++ (show i) ++ " finished with ThreadFinished"
+          start i p
+        ThreadDied -> do
+          logger $ "Fetcher " ++ (show i) ++ " finished with ThreadDied"
+          start i p 
+        _ -> return t
+    start i p = do
+      tid <- forkIO $ startFetcher i p
+      return (i, Just tid, p)
 
-waitFor tc = do 
+startBackground tc = do
   threadDelay 100000
   handle
-  waitFor tc
+  startBackground tc
   where
     handle = do 
       s <- atomically $ tryReadTChan tc
@@ -106,10 +122,9 @@ waitFor tc = do
       else
         return ()
 
-
-simpleFetch i pipe = do
+startFetcher i pipe = do
   --logger ("Building pipeline with params: " ++ (show chan) ++ " - " ++ (show chano) ++ " - " ++ (show proxy))
-  logger "New pipeline"
+  logger $ "New pipeline " ++ (show i)
   case pStartDelay pipe of 
     Just t -> do
       let ws = t * i
