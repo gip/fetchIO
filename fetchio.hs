@@ -51,14 +51,13 @@ logger m = do
 
 main = do
   args <- getArgs
-  catchAny (do
-    cfg <- (liftM $ decode) (BL.readFile $ P.head args)
-    if isJust cfg 
-    then
-      let cfg' = fromJust cfg in
-      start cfg'
-    else
-      output Err "couldn't read configuration") (\_ -> output Err "usage: fetchio <configuration file>")
+  case args of
+    fi:[] -> do
+      cfg <- (liftM $ decode) (BL.readFile fi)
+      case cfg of 
+        Left e -> output Err ("error: "++e)
+        Right cfg -> start cfg
+    _ -> output Err "usage: fetchio <configuration file>"
   return ()
 
 start cfg = do 
