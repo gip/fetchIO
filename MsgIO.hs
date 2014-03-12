@@ -105,7 +105,7 @@ data CfgPipeline = CfgPipeline {
   amqp_out_host :: Endpoint,
   amqp_in_queue :: Text,
   amqp_out_exchange :: Text,
-  http_proxys :: [Endpoint],
+  http_proxys :: [[Endpoint]],
   http_min_delay :: Maybe Int,
   http_start_delay :: Maybe Int
 } deriving(Generic, Show)

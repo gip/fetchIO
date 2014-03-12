@@ -69,7 +69,7 @@ start cfg = do
     startP tc pipe = do
       let ep_in = amqp_in_host pipe
       let ep_out = amqp_out_host pipe
-      let h = http_proxys pipe
+      let h = P.concat $ http_proxys pipe
       conn <- newConnection (ep_in,amqp_in_queue pipe)  
       conno <- newConnection (ep_out,amqp_out_exchange pipe)
       let f = \a b -> forkIO $ simpleFetch tc (pop conn) (push conno) (http_min_delay pipe) (http_start_delay pipe) a b
