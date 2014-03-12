@@ -42,7 +42,8 @@ instance Exception FetchTimeout
 instance Exception WrongFormat
 
 
-data Pipe c = Pipe { pChan :: TChan String,
+data Pipe a = Pipe { pId :: a,
+                     pChan :: TChan String,
                      pPop :: IO (Maybe (MsgIn,Bool -> IO ())),
                      pPush :: Text -> Value -> IO (),
                      pDelay :: Maybe Int,
@@ -50,6 +51,8 @@ data Pipe c = Pipe { pChan :: TChan String,
                      pProxy :: Endpoint
                    }
 
+instance (Show a) => Show (Pipe a)  where
+  show p = "Fetcher " ++ show (pId p) ++ ", proxy " ++ (show $ pProxy p)
 
 output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
   where p Err = "error"
@@ -85,8 +88,8 @@ startPipelines cfg = do
       conn <- newConnection (ep_in,amqp_in_queue pipe)  
       conno <- newConnection (ep_out,amqp_out_exchange pipe)
       let p = Pipe { pChan = tc, pPop = pop conn, pPush = push conno, pDelay = http_min_delay pipe, 
-                     pStartDelay = http_start_delay pipe, pProxy = undefined }
-      forkIO $ startPipelineBackground $ map (\(i,proxy) -> (i, Nothing, p { pProxy = proxy } ) ) (P.zip [0..] h) 
+                     pStartDelay = http_start_delay pipe, pProxy = undefined, pId = undefined }
+      forkIO $ startPipelineBackground $ map (\(i,proxy) -> (i, Nothing, p { pProxy = proxy, pId = i } ) ) (P.zip [0..] h) 
 
 startPipelineBackground threads = do
   threads' <- mapM handleThread threads
@@ -98,10 +101,10 @@ startPipelineBackground threads = do
       status <- threadStatus tid
       case status of
         ThreadFinished -> do
-          logger $ "Fetcher " ++ (show i) ++ " finished with ThreadFinished"
+          logger $ "Fetcher " ++ (show p) ++ " finished with ThreadFinished"
           start i p
         ThreadDied -> do
-          logger $ "Fetcher " ++ (show i) ++ " finished with ThreadDied"
+          logger $ "Fetcher " ++ (show p) ++ " finished with ThreadDied"
           start i p 
         _ -> return t
     start i p = do
@@ -124,7 +127,7 @@ startBackground tc = do
 
 startFetcher i pipe = do
   --logger ("Building pipeline with params: " ++ (show chan) ++ " - " ++ (show chano) ++ " - " ++ (show proxy))
-  logger $ "New pipeline " ++ (show i)
+  logger $ "New pipeline " ++ (show pipe)
   case pStartDelay pipe of 
     Just t -> do
       let ws = t * i
@@ -134,7 +137,6 @@ startFetcher i pipe = do
   loop0 pipe
   return ()
   where
-    --waitMs= fromJust wait
     loop0 pipe = forever $ do
       -- IO monad
       mng <- runErrorT newManager
