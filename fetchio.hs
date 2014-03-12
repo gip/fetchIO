@@ -66,7 +66,6 @@ start cfg = do
   waitFor tchan
   return () -- Dead
   where
-    firstHost hg = getHostInfo $ (P.head $ hosts (fromJust $ getHostGroup cfg hg))
     startP tc pipe = do
       let ep_in = amqp_in_host pipe
       let ep_out = amqp_out_host pipe

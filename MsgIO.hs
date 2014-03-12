@@ -98,18 +98,7 @@ msgOut = MsgOut {
 instance FromJSON Endpoint
 instance ToJSON Endpoint
 
-getHostInfo c = 
-  (fromMaybe "localhost" $ host c,
-   fromMaybe 80 $ port c,           
-   user c, pass c)
 
-
-data CfgHostGroup = CfgHostGroup {
-  group :: Text,
-  hosts :: [Endpoint]
-} deriving(Generic, Show)
-
-instance FromJSON CfgHostGroup
 
 data CfgPipeline = CfgPipeline {
   amqp_in_host :: Endpoint,
@@ -125,12 +114,8 @@ instance FromJSON CfgPipeline
 
 data CfgTop = CfgTop {
   name :: Text,
-  groups :: Maybe [CfgHostGroup],
   pipelines :: [CfgPipeline]
 } deriving(Generic, Show)
 
 instance FromJSON CfgTop
-
-getHostGroup :: CfgTop -> Text -> Maybe CfgHostGroup
-getHostGroup cfg g = join (liftM (L.find (\hg -> MsgIO.group hg == g)) $ groups cfg)
-  
+ 
