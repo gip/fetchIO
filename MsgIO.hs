@@ -98,8 +98,6 @@ msgOut = MsgOut {
 instance FromJSON Endpoint
 instance ToJSON Endpoint
 
-
-
 data CfgPipeline = CfgPipeline {
   amqp_in_host :: Endpoint,
   amqp_out_host :: Endpoint,

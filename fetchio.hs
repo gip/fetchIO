@@ -41,6 +41,15 @@ instance Exception FetchTimeout
 instance Exception WrongFormat
 
 
+data Pipe c = Pipe { pChan :: TChan String,
+                     pPop :: IO (Maybe (MsgIn,Bool -> IO ())),
+                     pPush :: Text -> Value -> IO (),
+                     pDelay :: Maybe Int,
+                     pStartDelay :: Maybe Int,
+                     pProxy :: Endpoint
+                   }
+
+
 output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
   where p Err = "error"
         p Info = "info"
@@ -48,6 +57,8 @@ output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
 logger m = do
   t <- getClockTime
   putStrLn $ P.concat ["[", show t, "][ts:", case t of TOD ts _ -> show ts,"] ", m]
+
+
 
 main = do
   args <- getArgs
@@ -61,9 +72,9 @@ main = do
   return ()
 
 start cfg = do 
-  tchan <- atomically $ newTChan
-  mapM_ (startP tchan) $ pipelines cfg
-  waitFor tchan
+  tc <- atomically $ newTChan
+  mapM_ (startP tc) $ pipelines cfg
+  waitFor tc
   return () -- Dead
   where
     startP tc pipe = do
@@ -72,7 +83,10 @@ start cfg = do
       let h = P.concat $ http_proxys pipe
       conn <- newConnection (ep_in,amqp_in_queue pipe)  
       conno <- newConnection (ep_out,amqp_out_exchange pipe)
-      let f = \a b -> forkIO $ simpleFetch tc (pop conn) (push conno) (http_min_delay pipe) (http_start_delay pipe) a b
+      let p = Pipe { pChan = tc, pPop = pop conn, pPush = push conno, pDelay = http_min_delay pipe, 
+                     pStartDelay = http_start_delay pipe, pProxy = undefined }
+      --let f = \a b -> forkIO $ simpleFetch tc (pop conn) (push conno) (http_min_delay pipe) (http_start_delay pipe) a b
+      let f = \i proxy -> forkIO $ simpleFetch i (p { pProxy= proxy })
       mapIM_ f h
       return ()
 
@@ -93,50 +107,47 @@ waitFor tc = do
         return ()
 
 
-simpleFetch tchan
-            fpop
-            fpush
-            wait
-            start_wait
-            i                          -- Index
-            proxy                      -- Proxy
-            = do
+simpleFetch i pipe = do
   --logger ("Building pipeline with params: " ++ (show chan) ++ " - " ++ (show chano) ++ " - " ++ (show proxy))
   logger "New pipeline"
-  when(isJust start_wait) $ do
-    let ws = (fromJust start_wait) * i
-    logger("Pipeline will wait for " ++ (show ws) ++ "s")
-    threadDelay $ 1000 * 1000 * ws
-  loop0 fpop fpush
+  case pStartDelay pipe of 
+    Just t -> do
+      let ws = t * i
+      logger("Pipeline will wait for " ++ (show ws) ++ "s")
+      threadDelay $ 1000 * 1000 * ws
+    Nothing -> return ()
+  loop0 pipe
   return ()
   where
-    waitMs= fromJust wait
-    loop0 fpop fpush = forever $ do
+    --waitMs= fromJust wait
+    loop0 pipe = forever $ do
       -- IO monad
       mng <- runErrorT newManager
-      loop1 fpop fpush mng
-    loop1 fpop fpush (Right mng) = do
+      loop1 pipe mng
+    loop1 pipe (Right mng) = do
       logger "Pipeline ready"
-      catches (loop fpop fpush mng) [Handler (\e -> do putStrLn $ show (e::FetchTimeout)
-                                                       _ <- runErrorT $ closeManager mng
-                                                       return ()
+      catches (loop pipe mng) [Handler (\e -> do putStrLn $ show (e::FetchTimeout)
+                                                 _ <- runErrorT $ closeManager mng
+                                                 return ()
                                              )]
-    loop fpop fpusf mng = forever $ do
-        iter fpop fpush mng proxy
-        when(isJust wait) (threadDelay $ 1000 * waitMs)
+    loop pipe mng = forever $ do
+        iter pipe mng
+        case pDelay pipe of
+          Just delay -> threadDelay $ 1000 * delay
+          Nothing -> return ()
 
-iter fpop fpush mng proxy = do
-  r <- fpop
+iter pipe mng = do
+  r <- (pPop pipe)
   case r of 
     Nothing -> return ()
     Just (mi, ackOrNack) -> do
       let urls = map cs $ getURLs mi
-      rs <- mapM (\url -> runErrorT $ fetch mng proxy url (getHeaders mi) (Just $ 15*1000*1000)) urls
+      rs <- mapM (\url -> runErrorT $ fetch mng (pProxy pipe) url (getHeaders mi) (Just $ 15*1000*1000)) urls
       case partitionEithers rs of
         (l@(lh:lt),_) -> do
           logger $ "Fetch failed for " ++ (show urls) ++ " with message " ++ (show lh)
           let isFatal = P.foldr (\e acc -> acc || (fatal e)) False l
-          logger $ "  Fatal" ++ (show isFatal)
+          logger $ "  Fatal " ++ (show isFatal)
           ackOrNack isFatal  
         ([], r@((_,res,dt,ts,red):rt)) -> do
           mapM_ ( \(url,(c,_,lat,ts,redirect)) -> logger $ "Fetched " ++ url ++ ", status " ++ (show c) ) $ P.zip urls r
@@ -146,20 +157,25 @@ iter fpop fpush mng proxy = do
               let mo0 = msgOut { fetch_data = if(c==200) then Just $ MString (Right $ fromJust res) else Nothing, 
                                  fetch_status_code = Just c,
                                  fetch_latency = Just dt,
-                                 fetch_proxy = Just proxy,
+                                 fetch_proxy = Just $ pProxy pipe,
                                  fetch_time = Just ts,
                                  fetch_redirect = fmap cs red }
               let mo1 = case r of _:[] -> mo0
                                   _:(_,r1,_,_,_):[] -> mo0 { fetch_data_1 = Just $ MString (Right $ fromJust r1) }  
                                   _:(_,r1,_,_,_)
                                    :(_,r2,_,_,_):[] -> mo0 { fetch_data_1 = Just $ MString (Right $ fromJust r1),
-                                                             fetch_data_2 = Just $ MString (Right $ fromJust r2) }                  
+                                                             fetch_data_2 = Just $ MString (Right $ fromJust r2) }   
+                                  _:(_,r1,_,_,_)
+                                   :(_,r2,_,_,_)
+                                   :(_,r3,_,_,_):[] -> mo0 { fetch_data_1 = Just $ MString (Right $ fromJust r1),
+                                                             fetch_data_2 = Just $ MString (Right $ fromJust r2),
+                                                             fetch_data_3 = Just $ MString (Right $ fromJust r3) }                                                                             
               let rk = T.concat [fetch_routing_key mi, ":", cs $ show c]
               let msg = case top_level mi of Just tl -> merge (toJSON mo1) tl
                                              Nothing -> toJSON mo0
               case c of
                 c | c==200 || c==404 || c==503 || c==403 -> do              
-                  fpush rk msg
+                  (pPush pipe) rk msg
                   logger $ "Publishing with key " ++ (show rk)
                   ackOrNack True
                 _ -> do
