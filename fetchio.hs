@@ -13,26 +13,12 @@ import Data.Text.Encoding
 import Data.Maybe
 import Data.Either
 import Data.List
---import Data.Aeson
 import Data.Text as T hiding(map)
 import Data.Text.Encoding
 import Data.Typeable
 import Data.String.Conversions
-import qualified Data.HashMap.Strict as HM
-
---import Data.Text.Lazy.Encoding
-import System.Time
-import System.Locale
-import Network
-import Network.TLS
---import Network.AMQP
---import Network.AMQP.Types
-import Network.Connection
-import Data.Conduit
-import Network.HTTP.Types.Status
---import Network.HTTP.Conduit as C
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString as BS
+
 import Control.Exception
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -41,9 +27,10 @@ import Control.Monad(when, liftM)
 import Control.Applicative ((<$>))
 import Control.Monad(forever)
 import Control.Monad.Error
+
 import System.Environment
 import System.Timeout
-
+import System.Time
 
 data Level = Err | Info deriving (Show)
 
@@ -126,12 +113,9 @@ simpleFetch tchan
   return ()
   where
     waitMs= fromJust wait
-    --proxy= (pn, pp, liftM encodeUtf8 puser, liftM encodeUtf8 ppass)
     loop0 fpop fpush = forever $ do
       -- IO monad
       mng <- runErrorT newManager
-      --mng <- case mnge of Right m -> return m
-      --logger ("Pipeline ready with params: " ++ (show chan) ++ " - " ++ (show chano) ++ " - " ++ (show proxy)) 
       loop1 fpop fpush mng
     loop1 fpop fpush (Right mng) = do
       logger "Pipeline ready"
@@ -183,79 +167,12 @@ iter fpop fpush mng proxy = do
                 _ -> do
                   logger ("Rejecting message, code " ++ (show c))
                   ackOrNack False  
-            _ ->
-              logger "All return codes were the same, don't know what to do"
-       
-      --let (code,mout)= case mo of 
-
+            _ -> do
+              logger "All return codes were the same, not sure what to do!"
+               ackOrNack False    
       return ()
   return ()
-  --where
-  --  fetch' proxys headers url = do
-  --    logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
-  --    tuple <- timeout (15*1000*1000) $ fetch proxy mng url headers
-  --    let (code,r,dt,ts,redirect) = case tuple of Just val -> val
-  --                                                Nothing -> throw FetchTimeout
-  --    let moo = msgOut { fetch_data = if(code==200) then Just $ MString (Right r) else Nothing, 
-  --                       fetch_status_code = Just code,
-  --                       fetch_latency = Just dt,
-  --                       fetch_proxy = proxys,
-  --                       fetch_time = Just ts,
-  --                       fetch_redirect = fmap decodeUtf8 redirect }
-  --    logger $ "Fetched " ++ url ++ ", " ++ (show proxys) ++ ", status " ++ (show $ code) ++ ", latency " ++ (show dt)
-  --                        ++ ", redirect " ++ (show redirect)
-  --    return moo 
-
-    --where foldErrorT f (x:xs) = do 
-    --        r <- runErrorT $ f x
-    --        case r of Right a -> return $ a:(foldErrorT f xs)
-    --                  Left e -> throwError e
-  --where
-  --  doit' mi ackOrNack = catches (doit mi ackOrNack) (handlers ackOrNack)
-    
-
-  --  handlerWrap ackOrNack h action = Handler (\e -> do
-  --    b <- h e
-  --    ackOrNack b
-  --    action
-  --    )
-  --  handlers tag = [ handlerWrap tag (\(e::FetchTimeout) -> return False) (throw FetchTimeout),
-  --                   handlerWrap tag (\(e::WrongFormat) -> return True) (return ()) ]
-  --  doit mi ackOrNack = do
-  --      let urls = map cs $ getURLs mi
-  --      let proxys = Just $ (\(h,p,_,_) -> T.concat [h, ":", cs $ show p]) $ proxy
-  --      -- 
-  --      mo <- mapM (fetch' proxys (getHeaders mi)) urls
-        
-  --      let (code,mout)= case mo of m:[] -> (fetch_status_code m, m) 
-  --                                  m:m1:[] -> (fetch_status_code m, m { fetch_data_1 = fetch_data m1 } )
-  --                                  m:m1:m2:[] -> (fetch_status_code m, m { fetch_data_1 = fetch_data m1, fetch_data_2 = fetch_data m2 } )
-  --      let rk = T.concat [fetch_routing_key mi, ":", cs $ show (fromJust code)]
-  --      let msg = merge (encode mout) (top_level mi) -- Keep the fields from MsgIn
-  --      case code of
-  --        Just c | c==200 || c==404 || c==503 || c==403 -> do              
-  --          fpush rk msg
-  --          logger ("Publishing with key " ++ (show rk))
-  --          ackOrNack True
-  --        Just c -> do -- Retry
-  --          logger ("Rejecting message, code " ++ (show c))
-  --          ackOrNack False
-  --  --merge (Object o0) (Just (Object o1)) = Object (HM.union o0 o1)
-  --  -- 
-  --  fetch' proxys headers url = do
-  --    logger $ "Fetching " ++ url ++ ", " ++ (show proxys)
-  --    tuple <- timeout (15*1000*1000) $ fetch proxy mng url headers
-  --    let (code,r,dt,ts,redirect) = case tuple of Just val -> val
-  --                                                Nothing -> throw FetchTimeout
-  --    let moo = msgOut { fetch_data = if(code==200) then Just $ MString (Right r) else Nothing, 
-  --                       fetch_status_code = Just code,
-  --                       fetch_latency = Just dt,
-  --                       fetch_proxy = proxys,
-  --                       fetch_time = Just ts,
-  --                       fetch_redirect = fmap decodeUtf8 redirect }
-  --    logger $ "Fetched " ++ url ++ ", " ++ (show proxys) ++ ", status " ++ (show $ code) ++ ", latency " ++ (show dt)
-  --                        ++ ", redirect " ++ (show redirect)
-  --    return moo    
+ 
 
 --
 -- Catching all exceptions
