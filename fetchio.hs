@@ -126,7 +126,6 @@ startBackground tc = do
         return ()
 
 startFetcher i pipe = do
-  --logger ("Building pipeline with params: " ++ (show chan) ++ " - " ++ (show chano) ++ " - " ++ (show proxy))
   logger $ "New pipeline " ++ (show pipe)
   case pStartDelay pipe of 
     Just t -> do
@@ -142,7 +141,7 @@ startFetcher i pipe = do
       mng <- runErrorT newManager
       loop1 pipe mng
     loop1 pipe (Right mng) = do
-      logger "Pipeline ready"
+      logger $ "Pipeline ready " ++ (show pipe)
       catches (loop pipe mng) [Handler (\e -> do putStrLn $ show (e::FetchTimeout)
                                                  _ <- runErrorT $ closeManager mng
                                                  return ()
