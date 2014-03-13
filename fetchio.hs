@@ -226,7 +226,7 @@ iter pipe mng = do
                   ackOrNack False  
             _ -> do
               logger "All return codes were the same, not sure what to do!"
-              ackOrNack False    
+              ackOrNack True
       return ()
   return ()
  

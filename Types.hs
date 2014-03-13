@@ -17,7 +17,7 @@ data Endpoint = Endpoint { host :: Maybe Text,
 
 instance Show Endpoint where
   show ep = Prelude.concat ["{host = ", show $ host ep, ", port = ", show $ port ep, 
-                            ", user = ", show $ f (user ep), ", pass = ", show $ f (pass ep)]
+                            ", user = ", show $ f (user ep), ", pass = ", show $ f (pass ep), "}"]
     where
       f (Just _) = "<redacted>"
       f _ = "<none>" 
