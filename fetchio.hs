@@ -193,7 +193,7 @@ iter pipe mng = do
           logger $ "  Fatal " ++ (show isFatal)
           ackOrNack isFatal  
         ([], r@((_,res,dt,ts,red):rt)) -> do
-          mapM_ ( \(url,(c,_,lat,ts,redirect)) -> logger $ "Fetched " ++ url ++ ", status " ++ (show c) ) $ P.zip urls r
+          mapM_ ( \(url,(c,_,lat,ts,redirect)) -> logger $ "Fetched " ++ url ++ ", status " ++ (show c) ++ " on " ++ (show pipe) ) $ P.zip urls r
           let codes = nub $ map (\(c,_,_,_,_) -> c) r
           case codes of 
             [c] -> do -- All return codes are same 
