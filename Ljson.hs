@@ -1,7 +1,7 @@
 -- 
--- Ljson implements a simple JSON with links (starting with '$')
+-- Ljson implements a simple JSON with links (starting with '$link:')
 --
--- { "abc" : v, "field1" : "v1", "field2" : "$abc" }  where v is whatever JSON value
+-- { "abc" : v, "field1" : "v1", "field2" : "$link:abc" }  where v is whatever JSON value
 -- will become { "abc" : "efg", "field1" : "v1", "field2" : v } 
 
 module Ljson(Ljson.decode, Ljson.encode, Value, merge, toJSON) where
@@ -12,6 +12,7 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.Vector as V
 import Data.Aeson as A
 import Data.Maybe
+import Data.Traversable as DT
 import Control.Monad
 
 
@@ -39,19 +40,17 @@ trans j = trans' j
   where
     d = flip dict $ j
     trans' (Object o) = do
-      r <- mapM f $ HM.toList o          -- Not sure how to do that without converting to a list?
-      return $ Object (HM.fromList r)
+      r <- DT.mapM trans' o
+      return $ Object r
     trans' (Array a) = do
-      r <- mapM trans' $ V.toList a
-      return $ Array (V.fromList r)
+      r <- DT.mapM trans' a
+      return $ Array r
     trans' ss@(String s) =
       if T.take 6 s == "$link:" then get $ T.drop 6 s else return ss 
     trans' x = return x
     get k = case d k of Just x -> return x
                         Nothing -> fail ("Key '" ++ T.unpack k ++ "' not found")
-    f (a,b) = do
-      bb <- trans' b
-      return (a,bb)
+
 
 -- dict k v searches for the key k
 --
