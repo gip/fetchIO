@@ -190,7 +190,7 @@ iter pipe mng = do
     Nothing -> return ()
     Just (mi, ackOrNack) -> do
       let urls = map cs $ getURLs mi
-      rs <- mapM (\url -> runErrorT $ fetch mng (pProxy pipe) url (getHeaders mi) (Just $ 15*1000*1000)) urls
+      rs <- mapM (\url -> runErrorT $ fetch mng (pProxy pipe) url (fromMaybe [] $ fetch_headers mi) (Just $ 15*1000*1000)) urls
       case partitionEithers rs of
         (l@(lh:lt),_) -> do
           logger $ "Fetch failed for " ++ (show urls) ++ " with message " ++ (show lh) ++ " on " ++ (show pipe)

@@ -22,13 +22,13 @@ import qualified Data.CaseInsensitive as CI
 --
 -- Input Message
 --
---data Header = Header { field :: Text, value :: Text } deriving (Generic, Show)
+--
 
 data MsgIn = MsgIn {
-  fetch_url :: Maybe Text,
-  fetch_urls :: Maybe Text,
-  fetch_headers :: Maybe [Header],
-  fetch_routing_key :: Text,
+  fetch_url :: Maybe Text,            -- A single URL (legacy)
+  fetch_urls :: Maybe Text,           -- Multiple URLs
+  fetch_headers :: Maybe [Header],    -- Headers
+  fetch_routing_key :: Text,          -- Routing key
   top_level :: Maybe Value            -- The full input message
 } deriving (Generic, Show)
 
@@ -37,12 +37,9 @@ instance FromJSON MsgIn
 instance ToJSON Header
 instance ToJSON MsgIn
 
-getHeaders mi = case fetch_headers mi of Nothing -> [] 
-                                         Just a -> a
-
 getURLs mi =
-  if(isJust $ fetch_url mi) then (fromJust $ fetch_url mi) : []
-  	                        else filter (\s -> s /= "") $ map strip (splitOn " " (fromJust $ fetch_urls mi))
+  case fetch_url mi of Just u -> u:[]
+                       Nothing -> filter (\s -> s /= "") $ map strip (splitOn " " (fromJust $ fetch_urls mi))
 
 
 class Monad m => Connector m c | m -> c where

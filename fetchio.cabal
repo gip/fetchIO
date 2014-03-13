@@ -1,16 +1,16 @@
 name:            fetchio
-version:         0.2
+version:         0.4
 license:         BSD3
 license-file:    LICENSE
 author:          Gilles Pirio <g36130@gmail.com>
-maintainer:      Michael Snoyman <g36130@gmail.com>
+maintainer:      Gilles Pirio <g36130@gmail.com>
 synopsis:        
 description:
 category:        Web
 stability:       Stable
 cabal-version:   >= 1.8
 build-type:      Simple
-homepage:        https://github.com/gip/fetchio
+homepage:        https://github.com/gip/fetchIO
 
 
 
