@@ -39,12 +39,8 @@ trans :: Monad m => Value -> m Value
 trans j = trans' j
   where
     d = flip dict $ j
-    trans' (Object o) = do
-      r <- DT.mapM trans' o
-      return $ Object r
-    trans' (Array a) = do
-      r <- DT.mapM trans' a
-      return $ Array r
+    trans' (Object o) = liftM Object $  DT.mapM trans' o
+    trans' (Array a) = liftM Array $ DT.mapM trans' a
     trans' ss@(String s) =
       if T.take 6 s == "$link:" then get $ T.drop 6 s else return ss 
     trans' x = return x
