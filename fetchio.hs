@@ -33,6 +33,9 @@ import System.Environment
 import System.Timeout
 import System.Time
 
+--
+-- Types
+--
 data Level = Err | Info deriving (Show)
 
 data FetchTimeout = FetchTimeout deriving (Show, Typeable)
@@ -41,7 +44,9 @@ data WrongFormat = WrongFormat deriving (Show, Typeable)
 instance Exception FetchTimeout
 instance Exception WrongFormat
 
-
+--
+-- Pipeline description record
+--
 data Pipe a = Pipe { pId :: a,
                      pChan :: TChan String,
                      pPop :: IO (Maybe (MsgIn,Bool -> IO ())),
@@ -54,16 +59,17 @@ data Pipe a = Pipe { pId :: a,
 instance (Show a) => Show (Pipe a)  where
   show p = "Fetcher " ++ show (pId p) ++ ", proxy " ++ (show $ pProxy p)
 
-output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
-  where p Err = "error"
-        p Info = "info"
-
+--
+-- Helper functions
+--
 logger m = do
   t <- getClockTime
   putStrLn $ P.concat ["[", show t, "][ts:", case t of TOD ts _ -> show ts,"] ", m]
 
 
-
+--
+-- main
+--
 main = do
   args <- getArgs
   case args of
@@ -74,7 +80,14 @@ main = do
         Right cfg -> startPipelines cfg
     _ -> output Err "usage: fetchio <configuration file>"
   return ()
+  where
+    output l m = putStrLn ("fetchio: " ++ (p l) ++ ": " ++ m)
+      where p Err = "error"
+            p Info = "info"
 
+--
+-- Start pipelines
+--
 startPipelines cfg = do 
   tc <- atomically $ newTChan
   mapM_ (startPipeline tc) $ pipelines cfg
@@ -91,6 +104,10 @@ startPipelines cfg = do
                      pStartDelay = http_start_delay pipe, pProxy = undefined, pId = undefined }
       forkIO $ startPipelineBackground $ map (\(i,proxy) -> (i, Nothing, p { pProxy = proxy, pId = i } ) ) (P.zip [0..] h) 
 
+--
+-- Pipeline background thread 
+-- The thread will just makes sure all fetcher threads are running
+--
 startPipelineBackground threads = do
   threads' <- mapM handleThread threads
   threadDelay 100000
@@ -111,6 +128,9 @@ startPipelineBackground threads = do
       tid <- forkIO $ startFetcher i p
       return (i, Just tid, p)
 
+--
+-- Start the main background thread that handles messages from the fetchers
+--
 startBackground tc = do
   threadDelay 100000
   handle
@@ -125,6 +145,9 @@ startBackground tc = do
       else
         return ()
 
+--
+-- Fetcher thread
+--
 startFetcher i pipe = do
   logger $ "New pipeline " ++ (show pipe)
   case pStartDelay pipe of 
@@ -152,6 +175,10 @@ startFetcher i pipe = do
           Just delay -> threadDelay $ 1000 * delay
           Nothing -> return ()
 
+--
+-- A single iteration of the fetcher
+-- It will read from the input, fetch the url(s) and then perform a write-back
+--
 iter pipe mng = do
   r <- (pPop pipe)
   case r of 
@@ -161,7 +188,7 @@ iter pipe mng = do
       rs <- mapM (\url -> runErrorT $ fetch mng (pProxy pipe) url (getHeaders mi) (Just $ 15*1000*1000)) urls
       case partitionEithers rs of
         (l@(lh:lt),_) -> do
-          logger $ "Fetch failed for " ++ (show urls) ++ " with message " ++ (show lh)
+          logger $ "Fetch failed for " ++ (show urls) ++ " with message " ++ (show lh) ++ " on " ++ (show pipe)
           let isFatal = P.foldr (\e acc -> acc || (fatal e)) False l
           logger $ "  Fatal " ++ (show isFatal)
           ackOrNack isFatal  

@@ -6,7 +6,6 @@ import Types
 
 import Data.Conduit
 import Data.Text(Text)
---import Data.Text.Encoding
 import Data.Maybe
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
