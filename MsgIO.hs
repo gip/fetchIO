@@ -45,14 +45,17 @@ getURLs mi =
   	                        else filter (\s -> s /= "") $ map strip (splitOn " " (fromJust $ fetch_urls mi))
 
 
-class Monad m => Connector m a c | m a -> c where
-  newConnection :: a -> m c 
+class Monad m => Connector m c | m -> c where
+  type ConnectionData
+  newConnection :: ConnectionData -> m c
 
-class (Monad m, Connector m a c)  => Source m a c r | m c r -> a where
-  pop :: c -> m (Maybe (r, Bool -> m ()))
+class (Monad m, Connector m c)  => Source m c r where
+  type SRouting
+  pop :: c -> SRouting -> m (Maybe (r, Bool -> m ()))
 
-class (Monad m, Connector m a c) => Dest m a c k r | m c r k -> a where
-  push :: c -> k -> r -> m ()
+class (Monad m, Connector m c) => Dest m c r where
+  type DRouting
+  push :: c -> DRouting -> r -> m ()
 
 --
 -- Output Message

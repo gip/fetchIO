@@ -13,7 +13,7 @@ data Endpoint = Endpoint { host :: Maybe Text,
                            port :: Maybe Int,
                            user :: Maybe Text,
                            pass :: Maybe Text 
-                         } deriving (Generic)
+                         } deriving (Generic,Eq)
 
 instance Show Endpoint where
   show ep = Prelude.concat ["{host = ", show $ host ep, ", port = ", show $ port ep, 

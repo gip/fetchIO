@@ -98,10 +98,15 @@ startPipelines cfg = do
       let ep_in = amqp_in_host pipe
       let ep_out = amqp_out_host pipe
       let h = P.concat $ http_proxys pipe
-      conn <- newConnection (ep_in,amqp_in_queue pipe)  
-      conno <- newConnection (ep_out,amqp_out_exchange pipe)
-      let p = Pipe { pChan = tc, pPop = pop conn, pPush = push conno, pDelay = http_min_delay pipe, 
-                     pStartDelay = http_start_delay pipe, pProxy = undefined, pId = undefined }
+      conn <- newConnection ep_in
+      conno <- if ep_in==ep_out then return conn
+                                else newConnection ep_out
+      let p = Pipe { pChan = tc, 
+                     pPop = pop conn (amqp_in_queue pipe), 
+                     pPush = curry (push conno) $ amqp_out_exchange pipe, 
+                     pDelay = http_min_delay pipe, 
+                     pStartDelay = http_start_delay pipe, 
+                     pProxy = undefined, pId = undefined }
       forkIO $ startPipelineBackground $ map (\(i,proxy) -> (i, Nothing, p { pProxy = proxy, pId = i } ) ) (P.zip [0..] h) 
 
 --
