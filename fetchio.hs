@@ -4,7 +4,8 @@ module Main where
 
 import Types
 import MsgIO
-import Http
+import Fetcher
+import FetcherHttpConduit
 import Amqp as A
 import Ljson
 

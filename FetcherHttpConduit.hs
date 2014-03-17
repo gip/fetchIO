@@ -1,8 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
-
-module Http where
+module FetcherHttpConduit where
 
 import Types
+import Fetcher
 
 import Data.Conduit
 import Data.Text(Text)

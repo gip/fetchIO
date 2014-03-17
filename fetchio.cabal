@@ -20,7 +20,7 @@ homepage:        https://github.com/gip/fetchIO
 Executable fetchio
   Main-is:             fetchio.hs
   hs-source-dirs:      .
-  other-modules:       Ljson, Http, MsgIO, Amqp, Types
+  other-modules:       Ljson, Fetcher, FetcherHttpConduit, MsgIO, Amqp, Types
   build-depends: base, stm, conduit, tls, network, connection, old-locale, old-time, text, case-insensitive
                , vector, unordered-containers, zlib, ghc-prim, base64-bytestring, random
                , monads-tf
