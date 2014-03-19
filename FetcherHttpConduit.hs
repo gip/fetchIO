@@ -1,4 +1,7 @@
+-- A Fetcher module built on top of Http.Conduit
+--
 module FetcherHttpConduit where
+
 
 import Types
 import Fetcher
@@ -21,9 +24,7 @@ import Network.Connection
 import System.Time
 import System.Timeout
 import Control.Exception as CE
-import Control.Monad.Error
-
--- Using monads-tf
+import Control.Monad.Error       -- Using monads-tf
 
 instance Fetcher IO Manager where
   newManager = lift $ C.newManager $ mkManagerSettings settings Nothing

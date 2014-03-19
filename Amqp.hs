@@ -1,12 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Amqp where
 
 import Types
 import Ljson
 
 import Data.Maybe
---import Data.Aeson
 import Data.Text
 import Data.String.Conversions
 

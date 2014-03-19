@@ -4,7 +4,7 @@
 -- { "abc" : v, "field1" : "v1", "field2" : "$link:abc" }  where v is whatever JSON value
 -- will become { "abc" : "efg", "field1" : "v1", "field2" : v } 
 
-module Ljson(Ljson.decode, Ljson.encode, Value, merge, toJSON) where
+module Ljson(Ljson.decode, Ljson.encode, Value, merge, toJSON, fromJSON) where
 
 import Data.ByteString.Lazy
 import Data.Text as T

@@ -19,11 +19,9 @@ import qualified Codec.Compression.Zlib as Z
 import Control.Monad
 import qualified Data.CaseInsensitive as CI
 
---
+
 -- Input Message
 --
---
-
 data MsgIn = MsgIn {
   fetch_url :: Maybe Text,            -- A single URL (legacy)
   fetch_urls :: Maybe Text,           -- Multiple URLs
@@ -54,10 +52,9 @@ class (Monad m, Connector m c) => Dest m c r where
   type DRouting
   push :: c -> DRouting -> r -> m ()
 
---
+
 -- Output Message
 -- 
-
 data MString = MString (Either String BL.ByteString) deriving(Show)
 
 instance ToJSON MString where
@@ -91,10 +88,8 @@ msgOut = MsgOut {
 }
 
 
---
 -- Config
 --
-
 instance FromJSON Endpoint
 instance ToJSON Endpoint
 
