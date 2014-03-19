@@ -183,8 +183,13 @@ startFetcher i pipe = do
           Just delay -> threadDelay $ 1000 * delay
           Nothing -> return ()
 
+data Controller a k m u p e aa =
+  forall s. Controller ( MsgIn -> Bool,
+                         s,
+                         (s,Result u p e aa) -> (s,Command a k m)
+                       )
 
-controllers = (FCDefault.canHandle,FCDefault.initial,FCDefault.handle)
+controllers = Controller (FCDefault.canHandle,FCDefault.initial,FCDefault.handle)
             : []
 
 ----
@@ -196,10 +201,10 @@ iter pipe mng = do
   case r of
     Nothing -> return ()
     Just (mi, ackOrNack) -> do
-      case find (\(can,_,_) -> can mi) controllers of
+      case find (\(Controller (can,_,_)) -> can mi) controllers of
         Nothing -> do
           ackOrNack False
-        Just (_,initial,handle) -> step (initial, Begin mi)
+        Just (Controller (_,initial,handle)) -> step (initial, Begin mi)
           where
             step st0 = do
               case handle st0 of 
