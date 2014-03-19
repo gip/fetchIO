@@ -6,7 +6,7 @@ import Types
 import MsgIO
 import Fetcher
 import FetchController
-import FetchControllerDefault
+import qualified FetchControllerDefault as FCDefault
 import FetcherHttpConduit
 import Amqp as A
 import Ljson
@@ -16,7 +16,7 @@ import Data.Text.Encoding
 import Data.Maybe
 import Data.Either
 import Data.List
-import Data.Text as T hiding(map)
+import Data.Text as T hiding(map,find)
 import Data.Text.Encoding
 import Data.Typeable
 import Data.String.Conversions
@@ -184,34 +184,66 @@ startFetcher i pipe = do
           Nothing -> return ()
 
 
---
--- A single iteration of the fetcher
--- It will read from the input, fetch the url(s) and then perform a write-back
---
+controllers = (FCDefault.canHandle,FCDefault.initial,FCDefault.handle)
+            : []
+
 iter pipe mng = do
   r <- (pPop pipe)
-  case r of 
+  case r of
     Nothing -> return ()
-    Just (mi, ackOrNack) -> step (FetchControllerDefault.initial, Begin mi)
-      where
-        step st0 = do
-          case FetchControllerDefault.handle st0 of 
-            (_, AcknSend rk msg) -> do
-              (pPush pipe) rk msg
-              logger $ "Publishing message, routing key"++(show rk)++" on"++(show pipe)
-              ackOrNack True
-              logger $ "Acking message on"++(show pipe)
-            (_, AckOnly) -> do
-              ackOrNack True
-              logger $ "Acking message on"++(show pipe)
-            (_, NackOnly _) -> do
-              ackOrNack False
-              logger $ "Rejecting message on "++(show pipe)
-            (st, Fetch url) -> do
-              r <- runErrorT $ fetch mng (pProxy pipe) (cs url) (fromMaybe [] $ fetch_headers mi) (Just $ 15*1000*1000)
-              case r of Left e -> logger $ "Fetched"++(show url)++", failed with message "++(show e)++" on "++(show pipe)
-                        Right (c,_,_,_,_) -> logger $ "Fetched "++(show url)++", status "++(show c)++" on "++(show pipe)
-              step (st, Result url (pProxy pipe) r)
+    Just (mi, ackOrNack) -> do
+      case find (\(can,_,_) -> can mi) controllers of
+        Nothing -> do
+          ackOrNack False
+        Just (_,initial,handle) -> step (initial, Begin mi)
+          where
+            step st0 = do
+              case handle st0 of 
+                (_, AcknSend rk msg) -> do
+                  (pPush pipe) rk msg
+                  logger $ "Publishing message, routing key"++(show rk)++" on"++(show pipe)
+                  ackOrNack True
+                  logger $ "Acking message on"++(show pipe)
+                (_, AckOnly) -> do
+                  ackOrNack True
+                  logger $ "Acking message on"++(show pipe)
+                (_, NackOnly _) -> do
+                  ackOrNack False
+                  logger $ "Rejecting message on "++(show pipe)
+                (st, Fetch url) -> do
+                  r <- runErrorT $ fetch mng (pProxy pipe) (cs url) (fromMaybe [] $ fetch_headers mi) (Just $ 15*1000*1000)
+                  case r of Left e -> logger $ "Fetched"++(show url)++", failed with message "++(show e)++" on "++(show pipe)
+                            Right (c,_,_,_,_) -> logger $ "Fetched "++(show url)++", status "++(show c)++" on "++(show pipe)
+                  step (st, Result url (pProxy pipe) r)
+
+----
+---- A single iteration of the fetcher
+---- It will read from the input, fetch the url(s) and then perform a write-back
+----
+--iter pipe mng = do
+--  r <- (pPop pipe)
+--  case r of 
+--    Nothing -> return ()
+--    Just (mi, ackOrNack) -> step (FetchControllerDefault.initial, Begin mi)
+--      where
+--        step st0 = do
+--          case FetchControllerDefault.handle st0 of 
+--            (_, AcknSend rk msg) -> do
+--              (pPush pipe) rk msg
+--              logger $ "Publishing message, routing key"++(show rk)++" on"++(show pipe)
+--              ackOrNack True
+--              logger $ "Acking message on"++(show pipe)
+--            (_, AckOnly) -> do
+--              ackOrNack True
+--              logger $ "Acking message on"++(show pipe)
+--            (_, NackOnly _) -> do
+--              ackOrNack False
+--              logger $ "Rejecting message on "++(show pipe)
+--            (st, Fetch url) -> do
+--              r <- runErrorT $ fetch mng (pProxy pipe) (cs url) (fromMaybe [] $ fetch_headers mi) (Just $ 15*1000*1000)
+--              case r of Left e -> logger $ "Fetched"++(show url)++", failed with message "++(show e)++" on "++(show pipe)
+--                        Right (c,_,_,_,_) -> logger $ "Fetched "++(show url)++", status "++(show c)++" on "++(show pipe)
+--              step (st, Result url (pProxy pipe) r)
 
 
 
