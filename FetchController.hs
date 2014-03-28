@@ -24,6 +24,7 @@ import Data.ByteString.Lazy as BL
 data Command a k m = AckOnly
                    | AcknSend k m
                    | NackOnly String
+                   | CantHandle
                    | Fetch a
   deriving(Show)
 
