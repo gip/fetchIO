@@ -23,6 +23,7 @@ import Network.Connection
 
 import System.Time
 import System.Timeout
+import Control.Monad.Trans.Resource
 import Control.Exception as CE
 import Control.Monad.Error       -- Using monads-tf
 
